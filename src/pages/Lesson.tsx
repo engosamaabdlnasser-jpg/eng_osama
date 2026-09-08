@@ -40,7 +40,7 @@ export default function Lesson() {
     );
   }
 
-  const currentLesson = lesson;
+  const currentLesson = lesson!;
   const embed = youtubeEmbedUrl(currentLesson.youtube_url);
 
   async function complete() {
@@ -67,7 +67,7 @@ export default function Lesson() {
     <section className="section">
       <div className="container">
         <Link
-          to={`/courses/${course.id}`}
+          to={`/courses/${course!.id}`}
           className="muted"
           style={{
             display: 'inline-flex',

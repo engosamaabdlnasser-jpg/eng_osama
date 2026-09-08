@@ -1,0 +1,9 @@
+ENG OSAMA — Supabase setup
+
+تم تجهيز ملف .env وربطه بعنوان مشروع Supabase الصحيح.
+
+المتبقي فقط:
+استبدل PUT_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE بمفتاح
+VITE_SUPABASE_PUBLISHABLE_KEY من صفحة Connect في Supabase.
+
+لا تضع Secret/Service Role Key هنا.

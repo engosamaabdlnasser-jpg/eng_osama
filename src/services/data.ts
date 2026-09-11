@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Category, Course, Lesson, Profile, SiteSettings, StudentMonitorRow } from '../types';
+import type { Category, Course, Lesson, Profile, SiteSettings, StudentMonitorRow, AdminStudentDetails } from '../types';
 import { DEMO_MODE } from '../utils/app';
 
 export const demoCategories: Category[] = [
@@ -60,6 +60,23 @@ export const defaultSiteSettings: SiteSettings = {
   dark_accent_soft: '#2a2113',
   ui_radius: '20px',
   ui_shadow: '0 18px 50px rgba(15,23,42,.12)',
+  ui_controls: {
+    container_width: '1120px',
+    header_height: '72px',
+    section_padding: '72px 0',
+    section_gap: '18px',
+    card_padding: '20px',
+    button_height: '44px',
+    icon_size: '20px',
+    button_icon_size: '18px',
+    header_logo_size: '36px',
+    header_gap: '18px',
+    header_logo_offset_x: '0px',
+    header_actions_offset_x: '0px',
+    cards_offset_y: '0px',
+    category_icon_size: '28px',
+    footer_padding: '30px 0',
+  },
   custom_css: '',
 };
 
@@ -87,6 +104,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     ...defaultSiteSettings,
     ...raw,
     extra_sections: Array.isArray(raw.extra_sections) ? raw.extra_sections : defaultSiteSettings.extra_sections,
+    ui_controls: { ...defaultSiteSettings.ui_controls, ...(raw.ui_controls || {}) },
   } as SiteSettings;
 }
 
@@ -119,11 +137,11 @@ export async function uploadSiteLogo(file: File) {
   return data.publicUrl;
 }
 
-export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null, phone: string | null = null, age: number | null = null) {
+export export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null, phone: string | null = null, age: number | null = null, profileSetupCompleted = true) {
   if (!supabase) throw new Error('Supabase غير مربوط.');
   const normalizedPhone = phone?.trim() || null;
   const normalizedAge = age === null || age === undefined || Number.isNaN(age) ? null : age;
-  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl, phone: normalizedPhone, age: normalizedAge }).eq('id', id).select().single();
+  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl, phone: normalizedPhone, age: normalizedAge, profile_setup_completed: profileSetupCompleted }).eq('id', id).select().single();
   if (error) throw error;
   return data as Profile;
 }
@@ -167,4 +185,13 @@ export async function getStudentMonitorData(): Promise<StudentMonitorRow[]> {
   const { data, error } = await supabase.rpc('admin_student_monitor');
   if (error) throw error;
   return (data ?? []) as StudentMonitorRow[];
+}
+
+export async function getAdminStudentDetails(userId: string): Promise<AdminStudentDetails> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.rpc('admin_student_profile', { target_user_id: userId });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('لم يتم العثور على بيانات الطالب.');
+  return row as AdminStudentDetails;
 }

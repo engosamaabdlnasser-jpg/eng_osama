@@ -85,9 +85,11 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     setBusy(true);
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
-        nav('/profile/setup');
+        const currentProfile = data.user ? await getProfile(data.user.id) : null;
+        if (currentProfile?.profile_setup_completed) nav('/account');
+        else nav('/profile/setup');
       } else {
         const cleanEmail = email.trim();
         const { data, error } = await supabase.auth.signUp({
@@ -96,7 +98,7 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           options: { data: { full_name: name.trim() || null }, emailRedirectTo: `${window.location.origin}/login?confirmed=1` },
         });
         if (error) throw error;
-        if (data.session) nav('/profile/setup');
+        if (data.session) { const currentProfile = await getProfile(data.user.id); nav(currentProfile?.profile_setup_completed ? '/account' : '/profile/setup'); }
         else { sessionStorage.setItem('eng_osama_pending_email', cleanEmail); nav(`/verify-email?email=${encodeURIComponent(cleanEmail)}`); }
       }
     } catch (e) { setError(friendlyAuthError(e)); }
@@ -136,6 +138,7 @@ export function ProfileSetup() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
@@ -161,7 +164,9 @@ export function ProfileSetup() {
         setName(currentProfile?.full_name || '');
         setPhone(currentProfile?.phone || '');
         setAge(currentProfile?.age != null ? String(currentProfile.age) : '');
+        if (currentProfile?.profile_setup_completed) { nav('/account'); return; }
         setAvatarUrl(currentProfile?.avatar_url || null);
+        setAvatarPreviewUrl(currentProfile?.avatar_url || null);
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : 'تعذر تحميل معلومات حسابك.');
       } finally { if (active) setLoading(false); }
@@ -173,9 +178,11 @@ export function ProfileSetup() {
   async function uploadAvatar(file?: File) {
     if (!file || !supabase || !profile) return;
     setError(''); setMsg(''); setUploading(true);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
     try {
       const url = await uploadProfileAvatar(profile.id, file);
       setAvatarUrl(url);
+      setAvatarPreviewUrl(url);
       setMsg('تم رفع الصورة. اضغط حفظ والمتابعة لتثبيتها على حسابك.');
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الصورة.'); }
     finally { setUploading(false); }
@@ -193,7 +200,7 @@ export function ProfileSetup() {
         setSaving(false);
         return;
       }
-      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge);
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true);
       setProfile(updated);
       setMsg('تم حفظ معلوماتك بنجاح.');
       window.setTimeout(() => nav('/account'), 450);
@@ -201,7 +208,21 @@ export function ProfileSetup() {
     finally { setSaving(false); }
   }
 
-  function skip() { if (!saving && !uploading) nav('/account'); }
+  async function skip() {
+    if (saving || uploading || !profile || !supabase) return;
+    setError(''); setMsg(''); setSaving(true);
+    try {
+      const parsedAge = age.trim() ? Number(age) : null;
+      if (parsedAge !== null && (!Number.isInteger(parsedAge) || parsedAge < 5 || parsedAge > 100)) {
+        setError('العمر يجب أن يكون رقمًا صحيحًا بين 5 و100 سنة.');
+        return;
+      }
+      await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true);
+      nav('/account');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر تجاوز هذه الخطوة. حاول مرة أخرى.');
+    } finally { setSaving(false); }
+  }
 
   const initials = (name || 'م').trim().charAt(0).toUpperCase() || 'م';
 
@@ -214,7 +235,7 @@ export function ProfileSetup() {
         <div className="profile-setup-grid">
           <div className="profile-setup-avatar-column">
             <label className="profile-setup-avatar" title="إضافة صورة شخصية">
-              {avatarUrl ? <img src={avatarUrl} alt="صورتك الشخصية"/> : <span>{initials}</span>}
+              {(avatarPreviewUrl || avatarUrl) ? <img src={avatarPreviewUrl || avatarUrl || ''} alt="صورتك الشخصية"/> : <span>{initials}</span>}
               <input className="sr-only" type="file" accept="image/*" disabled={uploading || saving} onChange={e => uploadAvatar(e.target.files?.[0])}/>
               <span className="profile-setup-avatar-badge" aria-hidden="true"><ImagePlus size={17}/></span>
             </label>

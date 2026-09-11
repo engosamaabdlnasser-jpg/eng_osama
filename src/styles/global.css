@@ -125,3 +125,36 @@ body{font-family:var(--site-font,'Cairo'),system-ui,sans-serif} .surface,.card{b
 .categories-page{min-height:calc(100vh - 72px);background:var(--bg)}
 .profile-setup-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:520px){.profile-setup-two-col{grid-template-columns:1fr}}
+
+/* ENG OSAMA V7 — admin visual layout controls */
+.container{width:min(var(--ui-container-width,1120px),calc(100% - 32px))}
+.section{padding:var(--ui-section-padding,72px 0)}
+.grid{gap:var(--ui-section-gap,18px)}
+.card-body{padding:var(--ui-card-padding,20px)}
+.btn{min-height:var(--ui-button-height,44px)}
+.btn svg{width:var(--ui-button-icon-size,18px);height:var(--ui-button-icon-size,18px)}
+.theme-toggle svg,.mobile-menu-btn svg{width:var(--ui-icon-size,20px);height:var(--ui-icon-size,20px)}
+.navbar-inner{height:var(--ui-header-height,72px);gap:var(--ui-header-gap,18px)}
+.immersive-auth-header-inner{gap:var(--ui-header-gap,18px)}
+.site-header .brand{transform:translateX(var(--ui-header-logo-offset-x,0px))}
+.site-header .desktop-nav{transform:translateX(var(--ui-header-actions-offset-x,0px))}
+.card,.category-card{transform:translateY(var(--ui-cards-offset-y,0px))}
+.category-card svg{width:var(--ui-category-icon-size,28px);height:var(--ui-category-icon-size,28px)}
+.site-footer{padding:var(--ui-footer-padding,30px 0)}
+.ui-control-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.student-name-cell{display:flex;align-items:center;gap:10px;min-width:190px}
+.btn-small{min-height:34px;padding:7px 10px;font-size:12px}
+.admin-modal-backdrop{position:fixed;inset:0;z-index:100;background:rgba(2,6,23,.68);backdrop-filter:blur(7px);display:grid;place-items:center;padding:20px}
+.admin-modal{width:min(760px,100%);max-height:min(88vh,760px);overflow:auto;padding:24px}
+.admin-modal-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:1px solid var(--border);padding-bottom:18px}
+.admin-modal-head h2{margin:8px 0 4px;font-size:28px}
+.admin-student-profile-grid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:24px;padding:22px 0}
+.admin-student-avatar{width:150px;height:150px;border-radius:32px;border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;overflow:hidden}
+.admin-student-avatar img{width:100%;height:100%;object-fit:cover}
+.admin-student-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.admin-student-fields>div{border:1px solid var(--border);border-radius:14px;padding:13px;display:grid;gap:6px;background:color-mix(in srgb,var(--surface) 92%,var(--accent-soft))}
+.admin-student-fields span{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.admin-student-fields strong{word-break:break-word}
+.admin-modal-note{padding:13px 15px;border-radius:14px;background:var(--accent-soft);color:var(--text);font-size:13px}
+@media(max-width:900px){.ui-control-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.ui-control-grid{grid-template-columns:1fr}.admin-student-profile-grid{grid-template-columns:1fr}.admin-student-avatar{margin:auto}.admin-student-fields{grid-template-columns:1fr}.admin-modal{padding:18px}.student-name-cell{align-items:flex-start;flex-direction:column}}

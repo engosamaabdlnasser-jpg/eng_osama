@@ -10,7 +10,10 @@ export default function Account() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [age, setAge] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [progress, setProgress] = useState<UserProgress>({ completedIds: new Set(), completedAt: {}, lastCompletedAt: null });
@@ -27,7 +30,7 @@ export default function Account() {
     let active = true;
     async function load() {
       if (!supabase) {
-        setProfile({ id: 'demo', full_name: 'زائر', phone: null, age: null, avatar_url: null, role: 'student' });
+        setProfile({ id: 'demo', full_name: 'زائر', phone: null, age: null, avatar_url: null, profile_setup_completed: true, role: 'student' });
         setName('زائر'); setAvatarUrl(null);
         return;
       }
@@ -37,7 +40,7 @@ export default function Account() {
       const [p, c, pr] = await Promise.all([getProfile(data.user.id), getCourses(), getUserProgress(data.user.id)]);
       if (!active) return;
       setProfile(p);
-      setName(p?.full_name || ''); setAvatarUrl(p?.avatar_url || null);
+      setName(p?.full_name || ''); setAvatarPreviewUrl(p?.avatar_url || null); setPhone(p?.phone || ''); setAge(p?.age != null ? String(p.age) : ''); setAvatarUrl(p?.avatar_url || null);
       setCourses(c);
       setProgress(pr);
     }
@@ -64,7 +67,9 @@ export default function Account() {
     if (!supabase || !profile || profile.id === 'demo') return;
     setSaving(true);
     try {
-      const updated = await updateProfileDetails(profile.id, name, avatarUrl, profile.phone, profile.age);
+      const parsedAge = age.trim() ? Number(age) : null;
+      if (parsedAge !== null && (!Number.isInteger(parsedAge) || parsedAge < 5 || parsedAge > 100)) { setError('العمر يجب أن يكون رقمًا صحيحًا بين 5 و100 سنة.'); setSaving(false); return; }
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true);
       setProfile(updated);
       setMsg('تم حفظ بيانات الملف الشخصي.');
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حفظ الاسم.'); }
@@ -74,7 +79,8 @@ export default function Account() {
   async function uploadAvatar(file?: File) {
     if (!file || !profile || profile.id === 'demo') return;
     setError(''); setMsg(''); setAvatarBusy(true);
-    try { const url = await uploadProfileAvatar(profile.id, file); const updated = await updateProfileDetails(profile.id, name, url, profile.phone, profile.age); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    try { const url = await uploadProfileAvatar(profile.id, file); setAvatarPreviewUrl(url); const updated = await updateProfileDetails(profile.id, name, url, phone, age.trim() ? Number(age) : null, true); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
     catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الصورة.'); }
     finally { setAvatarBusy(false); }
   }
@@ -98,7 +104,7 @@ export default function Account() {
 
   return <section className="section"><div className="container profile-page">
     <div className="profile-hero surface">
-      <label className="profile-avatar profile-avatar-edit" title="تغيير صورة الملف الشخصي">{avatarUrl ? <img src={avatarUrl} alt="صورة الملف الشخصي"/> : <span>{(profile?.full_name || 'ط').trim().charAt(0).toUpperCase() || 'ط'}</span>}<input className="sr-only" type="file" accept="image/*" disabled={avatarBusy} onChange={e=>uploadAvatar(e.target.files?.[0])}/><span className="avatar-edit-badge"><ImagePlus size={15}/></span></label>
+      <label className="profile-avatar profile-avatar-edit" title="تغيير صورة الملف الشخصي">{(avatarPreviewUrl || avatarUrl) ? <img src={avatarPreviewUrl || avatarUrl || ''} alt="صورة الملف الشخصي"/> : <span>{(profile?.full_name || 'ط').trim().charAt(0).toUpperCase() || 'ط'}</span>}<input className="sr-only" type="file" accept="image/*" disabled={avatarBusy} onChange={e=>uploadAvatar(e.target.files?.[0])}/><span className="avatar-edit-badge"><ImagePlus size={15}/></span></label>
       <div className="profile-hero-text"><span className="tag">الملف الشخصي</span><h1 className="section-title">أهلًا {profile?.full_name || 'بك'}</h1><p className="muted">{email || 'حساب طالب'} · {profile?.role === 'admin' ? 'مدير' : 'طالب'}</p></div>
       <div className="profile-actions"><button className="btn btn-ghost" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={17}/> : <Moon size={17}/>} {theme === 'dark' ? 'مظهر فاتح' : 'مظهر داكن'}</button><button className="btn btn-danger" onClick={logout}><LogOut size={17}/> تسجيل الخروج</button></div>
     </div>
@@ -119,6 +125,10 @@ export default function Account() {
       <form className="surface form-grid" style={{ padding: 24 }} onSubmit={saveProfile}>
         <div><span className="tag">بيانات الحساب</span><h2>معلوماتي</h2><p className="muted">يمكنك تعديل الاسم، بينما البريد مرتبط بحساب المصادقة.</p></div>
         <div><label className="label">الاسم</label><input className="input" value={name} onChange={e => setName(e.target.value)} /></div>
+        <div className="two-col">
+          <div><label className="label">رقم الهاتف</label><input className="input" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="01xxxxxxxxx" /></div>
+          <div><label className="label">العمر</label><input className="input" type="number" min="5" max="100" inputMode="numeric" value={age} onChange={e => setAge(e.target.value)} placeholder="مثال: 20" /></div>
+        </div>
         <div><label className="label">البريد الإلكتروني</label><input className="input" value={email} disabled /></div>
         <button className="btn btn-primary" disabled={saving}><Save size={17}/> {saving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
       </form>

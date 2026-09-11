@@ -30,3 +30,11 @@
 - Admin tabs now have explicit button semantics, icons, hover/focus states, and mobile layout.
 - Admin overview now shows the number of registered students.
 - Admin data loading is isolated so one optional panel failure does not blank the entire dashboard.
+
+
+## V7 — Profile onboarding and admin read-only student profiles
+- Profile setup is shown only once per account using `profile_setup_completed`.
+- Profile stores phone, age, avatar and completion state.
+- Admin student details are read-only and never return passwords.
+- Added admin visual layout controls through `site_settings.settings.ui_controls`.
+- Run `supabase/V7-PROFILE-ONBOARDING-ADMIN.sql` once in Supabase SQL Editor.

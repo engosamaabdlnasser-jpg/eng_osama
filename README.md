@@ -76,3 +76,19 @@ npm run preview
 - الطلاب يمكنهم قراءة الكورسات المنشورة والدروس التابعة لها وتعديل تقدمهم فقط.
 - لا يتم تخزين HTML من المستخدمين؛ يتم قبول رابط YouTube وتحويله إلى embed URL آمن.
 - حدود الاستخدام المجاني تعتمد على حدود الخطط الحالية لمزود الاستضافة وSupabase.
+
+
+## Professional upgrade — 0 EGP
+- Production-first data loading: no silent demo fallback unless `VITE_DEMO_MODE=true`.
+- Account profile photo upload through Supabase Storage.
+- Admin course-cover upload through Supabase Storage.
+- Courses search normalization, sorting, URL filters, loading/error/empty states.
+- Route guards for account/admin and a React Error Boundary.
+- Accessibility polish: focus-visible, screen-reader utility, mobile menu ARIA state.
+- SEO foundation: canonical, robots, sitemap, favicon, Open Graph image.
+
+### Database update
+Run `supabase/portfolio-upgrade.sql` once after the existing schema. It adds `avatar_url`, protects student roles from self-escalation, and enables profile/course image storage.
+
+### Demo mode
+Keep `VITE_DEMO_MODE=false` in production. Demo data is only available when explicitly enabled.

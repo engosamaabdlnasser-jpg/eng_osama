@@ -1,5 +1,6 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Settings, UsersRound } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo } from '../services/data';
 import type { Category, Course, HomeExtraSection, Profile, SiteSettings, StudentMonitorRow } from '../types';
@@ -27,8 +28,21 @@ export default function Admin() {
     const p = await getProfile(data.user.id);
     if (p?.role !== 'admin') { nav('/'); return; }
     setProfile(p);
-    const [c, k, u, s, site] = await Promise.all([getAllCourses(), getCategories(), getAdminProfiles(), getStudentMonitorData(), getSiteSettings()]);
-    setCourses(c); setCats(k); setUsers(u); setStudents(s.filter(x=>x.role==='student')); setSettings(site);
+
+    const results = await Promise.allSettled([
+      getAllCourses(),
+      getCategories(),
+      getAdminProfiles(),
+      getStudentMonitorData(),
+      getSiteSettings(),
+    ]);
+    const messages: string[] = [];
+    if (results[0].status === 'fulfilled') setCourses(results[0].value); else messages.push('تعذر تحميل الكورسات.');
+    if (results[1].status === 'fulfilled') setCats(results[1].value); else messages.push('تعذر تحميل التصنيفات.');
+    if (results[2].status === 'fulfilled') setUsers(results[2].value); else messages.push('تعذر تحميل المستخدمين.');
+    if (results[3].status === 'fulfilled') setStudents(results[3].value.filter(x=>x.role==='student')); else messages.push('تعذر تحميل مراقبة الطلاب. شغّل ملف قاعدة البيانات الجديد مرة واحدة.');
+    if (results[4].status === 'fulfilled') setSettings(results[4].value); else messages.push('تعذر تحميل إعدادات الموقع. شغّل ملف قاعدة البيانات الجديد مرة واحدة.');
+    if (messages.length) setError(messages.join(' '));
   }
 
   useEffect(() => { load().catch(e => setError(e instanceof Error ? e.message : 'حدث خطأ')); }, [nav]);
@@ -53,14 +67,18 @@ export default function Admin() {
 
   return <section className="section"><div className="container">
     <div className="section-head"><div><span className="tag">Admin</span><h1 className="section-title">لوحة التحكم</h1><p className="muted">مرحبًا {profile?.full_name||'Admin'} — إدارة المنصة من مكان واحد.</p></div><Link className="btn btn-primary" to="/admin/courses/new">إضافة كورس</Link></div>
-    <div className="admin-tabs"><button className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}>نظرة عامة</button><button className={tab==='content'?'active':''} onClick={()=>setTab('content')}>إعدادات الموقع</button><button className={tab==='students'?'active':''} onClick={()=>setTab('students')}>مراقبة الطلاب</button></div>
+    <div className="admin-tabs" role="tablist" aria-label="أقسام لوحة الإدارة">
+      <button type="button" role="tab" aria-selected={tab==='overview'} className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}><LayoutDashboard size={17}/> نظرة عامة</button>
+      <button type="button" role="tab" aria-selected={tab==='content'} className={tab==='content'?'active':''} onClick={()=>setTab('content')}><Settings size={17}/> إعدادات الموقع</button>
+      <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}><UsersRound size={17}/> مراقبة الطلاب</button>
+    </div>
     {error&&<div className="error" style={{marginBottom:12}}>{error}</div>}{msg&&<div className="notice" style={{marginBottom:12}}>{msg}</div>}
 
     {tab==='overview'&&<>
-      <div className="grid admin-stats"><div className="surface stat"><span className="muted">المستخدمون</span><strong>{users.length}</strong></div><div className="surface stat"><span className="muted">الكورسات</span><strong>{courses.length}</strong></div><div className="surface stat"><span className="muted">الدروس</span><strong>{lessonsCount}</strong></div><div className="surface stat"><span className="muted">متوسط تقدم الطلاب</span><strong>{averageCompletion}%</strong></div></div>
+      <div className="grid admin-stats"><div className="surface stat"><span className="muted">الطلاب المسجلون</span><strong>{students.length}</strong></div><div className="surface stat"><span className="muted">الكورسات</span><strong>{courses.length}</strong></div><div className="surface stat"><span className="muted">الدروس</span><strong>{lessonsCount}</strong></div><div className="surface stat"><span className="muted">متوسط تقدم الطلاب</span><strong>{averageCompletion}%</strong></div></div>
       <div className="admin-columns"><div className="surface table-wrap"><div className="admin-panel-head"><div><h2>الكورسات</h2><p className="muted">إضافة، تعديل، نشر أو إخفاء وحذف.</p></div></div><table className="table"><thead><tr><th>الكورس</th><th>الحالة</th><th>الدروس</th><th>إجراء</th></tr></thead><tbody>{courses.map(c=><tr key={c.id}><td><strong>{c.title}</strong><div className="muted small">{c.category?.name||'بدون تصنيف'}</div></td><td><button className="status-button" onClick={()=>togglePublished(c)}>{c.published?'منشور':'مخفي'}</button></td><td>{c.lessons?.length??0}</td><td><div className="rtl-row"><Link className="btn btn-ghost" to={`/admin/courses/${c.id}/edit`}>تعديل</Link><button className="btn btn-danger" onClick={()=>removeCourse(c)}>حذف</button></div></td></tr>)}</tbody></table>{!courses.length&&<div className="empty">لا توجد كورسات بعد.</div>}</div>
         <div className="grid" style={{gap:18}}><div className="surface admin-panel"><div className="admin-panel-head"><div><h2>التصنيفات</h2><p className="muted">تحكم سريع في المجالات.</p></div></div><form className="rtl-row" onSubmit={addCategory}><input className="input" value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="اسم التصنيف" required/><button className="btn btn-primary">إضافة</button></form><div className="admin-list">{cats.map(c=><div className="admin-list-row" key={c.id}><strong>{c.name}</strong><div className="rtl-row"><button className="btn btn-ghost" onClick={()=>editCategory(c)}>تعديل</button><button className="btn btn-danger" onClick={()=>removeCategory(c)}>حذف</button></div></div>)}</div></div>
-          <div className="surface admin-panel"><div className="admin-panel-head"><div><h2>المستخدمون</h2><p className="muted">الحسابات المسجلة وصلاحياتها.</p></div></div><div className="admin-list">{users.slice(0,12).map(u=><div className="admin-list-row" key={u.id}><div><strong>{u.full_name||'بدون اسم'}</strong><div className="muted small">{u.role==='admin'?'مدير':'طالب'}</div></div><div className="rtl-row"><span className="tag">{u.role}</span>{u.id!==profile?.id&&<button className="btn btn-ghost" onClick={()=>changeRole(u)}>{u.role==='admin'?'جعله طالبًا':'جعله مديرًا'}</button>}</div></div>)}</div>{users.length>12&&<p className="muted small">عرض أول 12 مستخدمًا.</p>}</div>
+          <div className="surface admin-panel"><div className="admin-panel-head"><div><h2>المستخدمون</h2><p className="muted">الحسابات المسجلة وصلاحياتها. الطلاب فقط: {students.length}</p></div></div><div className="admin-list">{users.slice(0,12).map(u=><div className="admin-list-row" key={u.id}><div><strong>{u.full_name||'بدون اسم'}</strong><div className="muted small">{u.role==='admin'?'مدير':'طالب'}</div></div><div className="rtl-row"><span className="tag">{u.role}</span>{u.id!==profile?.id&&<button className="btn btn-ghost" onClick={()=>changeRole(u)}>{u.role==='admin'?'جعله طالبًا':'جعله مديرًا'}</button>}</div></div>)}</div>{users.length>12&&<p className="muted small">عرض أول 12 مستخدمًا.</p>}</div>
         </div></div>
     </>}
 

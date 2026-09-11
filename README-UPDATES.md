@@ -23,3 +23,10 @@
 `/admin` → `إعدادات الموقع`
 
 ومن هناك تستطيع رفع اللوجو وتعديل محتوى الصفحة بدون الرجوع للكود.
+
+
+## V2 production repair
+- Added `supabase/V2-FIX-ONCE.sql` to provision site settings, storage, profile avatars, and the admin-only student monitor in one idempotent migration.
+- Admin tabs now have explicit button semantics, icons, hover/focus states, and mobile layout.
+- Admin overview now shows the number of registered students.
+- Admin data loading is isolated so one optional panel failure does not blank the entire dashboard.

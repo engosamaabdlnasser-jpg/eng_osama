@@ -17,7 +17,8 @@ export default function Admin() {
   const [newCat, setNewCat] = useState('');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState<'overview'|'content'|'students'>('overview');
+  const [tab, setTab] = useState<'overview'|'content'|'visual'|'students'>('overview');
+  const [visualTarget, setVisualTarget] = useState('header');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingInstructor, setUploadingInstructor] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -93,6 +94,7 @@ export default function Admin() {
     <div className="admin-tabs" role="tablist" aria-label="أقسام لوحة الإدارة">
       <button type="button" role="tab" aria-selected={tab==='overview'} className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}><LayoutDashboard size={17}/> نظرة عامة</button>
       <button type="button" role="tab" aria-selected={tab==='content'} className={tab==='content'?'active':''} onClick={()=>setTab('content')}><Settings size={17}/> إعدادات الموقع</button>
+      <button type="button" role="tab" aria-selected={tab==='visual'} className={tab==='visual'?'active':''} onClick={()=>setTab('visual')}><Settings size={17}/> المحرر البصري</button>
       <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}><UsersRound size={17}/> مراقبة الطلاب</button>
     </div>
     {error&&<div className="error" style={{marginBottom:12}}>{error}</div>}{msg&&<div className="notice" style={{marginBottom:12}}>{msg}</div>}
@@ -104,6 +106,37 @@ export default function Admin() {
           <div className="surface admin-panel"><div className="admin-panel-head"><div><h2>المستخدمون</h2><p className="muted">الحسابات المسجلة وصلاحياتها. الطلاب فقط: {students.length}</p></div></div><div className="admin-list">{users.slice(0,12).map(u=><div className="admin-list-row" key={u.id}><div><strong>{u.full_name||'بدون اسم'}</strong><div className="muted small">{u.role==='admin'?'مدير':'طالب'}</div></div><div className="rtl-row"><span className="tag">{u.role}</span><button type="button" className="btn btn-ghost" onClick={()=>openStudentDetails(u.id)} disabled={studentDetailsLoading}>عرض الملف</button>{u.id!==profile?.id&&<button className="btn btn-ghost" onClick={()=>changeRole(u)}>{u.role==='admin'?'جعله طالبًا':'جعله مديرًا'}</button>}</div></div>)}</div>{users.length>12&&<p className="muted small">عرض أول 12 مستخدمًا.</p>}</div>
         </div></div>
     </>}
+
+    {tab==='visual'&&<form className="surface form-grid visual-editor" style={{padding:24}} onSubmit={saveSettings}>
+      <div className="visual-editor-head"><div><span className="tag">V9 • Admin only</span><h2>المحرر البصري</h2><p className="muted">غيّر شكل العناصر الأساسية من لوحة الإدارة بدون تعديل الكود. التغييرات تُحفظ داخل إعدادات الموقع وتظهر على المنصة.</p></div><div className="visual-editor-badge">Design System</div></div>
+      <div className="visual-editor-layout">
+        <aside className="visual-targets" aria-label="العناصر القابلة للتعديل">
+          {[
+            ['header','الهيدر','اللوجو والقائمة وأدوات المظهر'],
+            ['hero','القسم الرئيسي','العنوان والوصف ومساحة البداية'],
+            ['cards','الكروت','الحجم والحركة ونصف القطر'],
+            ['categories','التصنيفات','الأيقونة والحشو والحركة'],
+            ['buttons','الأزرار','الارتفاع ونصف القطر وحجم الأيقونة'],
+            ['footer','الفوتر','المسافات وارتفاع المساحة'],
+          ].map(([key,title,desc])=><button type="button" key={key} className={`visual-target ${visualTarget===key?'active':''}`} onClick={()=>setVisualTarget(key)}><strong>{title}</strong><span>{desc}</span></button>)}
+        </aside>
+        <div className="visual-editor-panel">
+          {visualTarget==='header'&&<>
+            <h3>الهيدر</h3><p className="muted small">تحكم في الحجم والمسافات ومكان اللوجو وأدوات الهيدر.</p>
+            <div className="two-col">{[
+              ['header_height','ارتفاع الهيدر'],['header_logo_size','حجم اللوجو'],['header_gap','المسافة بين عناصر الهيدر'],['nav_gap','المسافة بين روابط القائمة'],['header_logo_offset_x','تحريك اللوجو أفقيًا'],['header_actions_offset_x','تحريك أدوات الهيدر أفقيًا']
+            ].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(settings.ui_controls as any)[key]??''} onChange={e=>setSettings({...settings,ui_controls:{...settings.ui_controls,[key]:e.target.value}})} /></div>)}</div>
+          </>}
+          {visualTarget==='hero'&&<><h3>القسم الرئيسي</h3><p className="muted small">تعديل حجم العنوان والوصف ومكان القسم.</p><div className="two-col">{[['hero_title_size','حجم العنوان'],['hero_description_size','حجم الوصف'],['hero_offset_y','تحريك القسم رأسيًا'],['section_padding','مسافات القسم']].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(settings.ui_controls as any)[key]??''} onChange={e=>setSettings({...settings,ui_controls:{...settings.ui_controls,[key]:e.target.value}})} /></div>)}</div></>}
+          {visualTarget==='cards'&&<><h3>الكروت</h3><p className="muted small">تحكم في شكل الكروت وحجمها ومكانها بدون تغيير محتوى الكورس.</p><div className="two-col">{[['card_radius','نصف قطر الكارت'],['card_padding','حشو الكارت'],['card_offset_x','تحريك الكروت أفقيًا'],['cards_offset_y','تحريك الكروت رأسيًا'],['card_scale','تكبير/تصغير الكارت'],['section_gap','المسافة بين الكروت']].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(settings.ui_controls as any)[key]??''} onChange={e=>setSettings({...settings,ui_controls:{...settings.ui_controls,[key]:e.target.value}})} /></div>)}</div></>}
+          {visualTarget==='categories'&&<><h3>التصنيفات</h3><p className="muted small">تحكم في أيقونات التصنيفات وحشو البطاقات ومكان الأيقونة.</p><div className="two-col">{[['category_icon_size','حجم الأيقونة'],['category_icon_offset_x','تحريك الأيقونة أفقيًا'],['category_icon_offset_y','تحريك الأيقونة رأسيًا'],['category_card_padding','حشو بطاقة التصنيف']].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(settings.ui_controls as any)[key]??''} onChange={e=>setSettings({...settings,ui_controls:{...settings.ui_controls,[key]:e.target.value}})} /></div>)}</div></>}
+          {visualTarget==='buttons'&&<><h3>الأزرار</h3><p className="muted small">نظام موحّد للأزرار الأساسية وأيقوناتها.</p><div className="two-col">{[['button_height','ارتفاع الزر'],['button_radius','نصف قطر الزر'],['button_icon_size','حجم أيقونة الزر'],['icon_size','حجم الأيقونات العامة']].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(settings.ui_controls as any)[key]??''} onChange={e=>setSettings({...settings,ui_controls:{...settings.ui_controls,[key]:e.target.value}})} /></div>)}</div></>}
+          {visualTarget==='footer'&&<><h3>الفوتر</h3><p className="muted small">تحكم في المسافات والمساحة حول الفوتر.</p><div className="two-col">{[['footer_padding','حشو الفوتر'],['footer_margin_top','المسافة قبل الفوتر']].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(settings.ui_controls as any)[key]??''} onChange={e=>setSettings({...settings,ui_controls:{...settings.ui_controls,[key]:e.target.value}})} /></div>)}</div></>}
+          <div className="visual-preview"><div><strong>معاينة سريعة</strong><span className="muted small">التغيير يطبق مباشرة على الواجهة بعد الحفظ أو عند تحديث الإعدادات.</span></div><div className="visual-preview-row"><div className="preview-logo"></div><div className="preview-lines"><i></i><i></i><i></i></div><button type="button" className="btn btn-primary">زر</button></div></div>
+        </div>
+      </div>
+      <div className="settings-actions"><button className="btn btn-primary save-settings-btn" disabled={savingSettings}>{savingSettings ? 'جاري الحفظ...' : 'حفظ تعديلات المحرر'}</button><button type="button" className="btn btn-ghost" onClick={resetDesign} disabled={savingSettings}>إرجاع الافتراضي</button>{savedAt&&<span className="save-confirm" role="status">✓ تم الحفظ الساعة {savedAt}</span>}</div>
+    </form>}
 
     {tab==='content'&&<form className="surface form-grid" style={{padding:24}} onSubmit={saveSettings}>
       <div className="admin-form-note"><strong>إدارة كاملة للمظهر والمحتوى الظاهر للزائر</strong><span className="muted">غير اللوجو والنصوص والأقسام من هنا، بدون تعديل الكود.</span></div>

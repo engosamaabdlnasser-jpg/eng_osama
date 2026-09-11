@@ -69,6 +69,7 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const nav = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -86,13 +87,13 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
-        nav('/account');
+        nav('/profile/setup');
       } else {
         const cleanEmail = email.trim();
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/profile/setup` },
+          options: { data: { full_name: name.trim() || null }, emailRedirectTo: `${window.location.origin}/login?confirmed=1` },
         });
         if (error) throw error;
         if (data.session) nav('/profile/setup');
@@ -117,6 +118,7 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {mode === 'login' && confirmed && <div className="notice" style={{marginTop:14}}>تم تأكيد بريدك الإلكتروني بنجاح. يمكنك تسجيل الدخول الآن.</div>}
         </div>
         <form className="surface form-grid auth-form" onSubmit={submit}>
+          {mode === 'signup' && <div><label className="label" htmlFor="auth-name">الاسم</label><input id="auth-name" className="input" autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></div>}
           <div><label className="label" htmlFor="auth-email">البريد الإلكتروني</label><input id="auth-email" required type="email" autoComplete="email" className="input" value={email} onChange={e => setEmail(e.target.value)} /></div>
           <div><div className="form-label-row"><label className="label" htmlFor="auth-password">كلمة المرور</label>{mode === 'login' && <Link className="form-link" to="/forgot-password">نسيت كلمة المرور؟</Link>}</div><PasswordField value={password} onChange={setPassword} mode={mode}/></div>
           {error && <div className="error" role="alert">{error}</div>}{msg && <div className="notice" role="status">{msg}</div>}
@@ -229,7 +231,7 @@ export function VerifyEmail() {
   const queryEmail = new URLSearchParams(location.search).get('email')?.trim() || '';
   const [email, setEmail] = useState(() => queryEmail || sessionStorage.getItem('eng_osama_pending_email') || '');
   const [error, setError] = useState(''); const [msg, setMsg] = useState(''); const [busy, setBusy] = useState(false); const [seconds, setSeconds] = useState(0);
-  async function resend() { setError(''); setMsg(''); if (!supabase) { setError('Supabase غير مربوط بعد.'); return; } const cleanEmail=email.trim(); if(!cleanEmail){setError('اكتب البريد الإلكتروني أولًا.');return;} if(seconds>0||busy)return; setBusy(true); try{const {error}=await supabase.auth.resend({type:'signup',email:cleanEmail,options:{emailRedirectTo:`${window.location.origin}/profile/setup`}});if(error)throw error;sessionStorage.setItem('eng_osama_pending_email',cleanEmail);setMsg('تمت إعادة إرسال رسالة التفعيل. راجع بريدك الإلكتروني ومجلد البريد غير المرغوب فيه.');setSeconds(60);const interval=window.setInterval(()=>setSeconds(current=>{if(current<=1){window.clearInterval(interval);return 0;}return current-1;}),1000);}catch(e){setError(friendlyAuthError(e));}finally{setBusy(false);} }
+  async function resend() { setError(''); setMsg(''); if (!supabase) { setError('Supabase غير مربوط بعد.'); return; } const cleanEmail=email.trim(); if(!cleanEmail){setError('اكتب البريد الإلكتروني أولًا.');return;} if(seconds>0||busy)return; setBusy(true); try{const {error}=await supabase.auth.resend({type:'signup',email:cleanEmail,options:{emailRedirectTo:`${window.location.origin}/login?confirmed=1`}});if(error)throw error;sessionStorage.setItem('eng_osama_pending_email',cleanEmail);setMsg('تمت إعادة إرسال رسالة التفعيل. راجع بريدك الإلكتروني ومجلد البريد غير المرغوب فيه.');setSeconds(60);const interval=window.setInterval(()=>setSeconds(current=>{if(current<=1){window.clearInterval(interval);return 0;}return current-1;}),1000);}catch(e){setError(friendlyAuthError(e));}finally{setBusy(false);} }
   return <section className="section"><div style={{maxWidth:520,margin:'auto'}}><div className="verify-card surface"><div className="verify-icon" aria-hidden="true">✉</div><span className="tag">تفعيل الحساب</span><h1 style={{fontSize:32,marginBottom:8}}>راجع بريدك الإلكتروني</h1><p className="muted verify-lead">أرسلنا رسالة تفعيل إلى البريد التالي. افتح الرسالة واضغط على رابط التأكيد لإكمال إنشاء حسابك.</p><div className="verify-email-box"><span className="small muted">البريد المستخدم في التسجيل</span><strong>{email||'لم يتم تحديد البريد'}</strong></div><div className="verify-help"><strong>لم تجد الرسالة؟</strong><p className="muted">راجع مجلد <b>البريد غير المرغوب فيه (Spam)</b> و<strong>العروض (Promotions)</strong>، ثم ابحث عن رسالة من ENG OSAMA.</p></div>{error&&<div className="error" role="alert">{error}</div>}{msg&&<div className="notice" role="status">{msg}</div>}{!email&&<div><label className="label">البريد الإلكتروني</label><input className="input" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com"/></div>}<div className="verify-actions"><button className="btn btn-primary" type="button" disabled={busy||seconds>0||!email.trim()} onClick={resend}>{busy?'جاري إعادة الإرسال...':seconds>0?`إعادة الإرسال بعد ${seconds}ث`:'إعادة إرسال رسالة التفعيل'}</button><Link className="btn btn-ghost" to="/login">العودة لتسجيل الدخول</Link></div><p className="small muted" style={{margin:0}}>بعد الضغط على رابط التفعيل، ستنتقل لإضافة معلوماتك الشخصية أو يمكنك تخطيها.</p></div></div></section>;
 }
 

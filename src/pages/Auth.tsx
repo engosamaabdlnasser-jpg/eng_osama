@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Clock3, Eye, EyeOff, Mail, MessageCircle, Phone } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { defaultSiteSettings, getSiteSettings } from '../services/data';
 import type { SiteSettings } from '../types';
@@ -22,29 +22,28 @@ export function Signup() { return <AuthForm mode="signup" />; }
 
 function PublicPlatformPanel({ settings }: { settings: SiteSettings }) {
   return <aside className="auth-side">
-    <div className="auth-side-top">
-      <span className="tag">{settings.hero_badge || 'منصة تعليمية مجانية'}</span>
-      <h2>{settings.public_welcome_title || 'أهلاً بيك في منصتك التعليمية'}</h2>
-      <p>{settings.public_welcome_description || 'سجّل دخولك للوصول إلى الكورسات والدروس ومتابعة تقدمك خطوة بخطوة.'}</p>
-    </div>
-
+    <div className="auth-side-glow" aria-hidden="true" />
     <div className="auth-brand-visual" aria-label={settings.brand_name || 'ENG OSAMA'}>
       <img className="auth-brand-logo auth-brand-logo-light" src="/eng-osama-logo-light.png" alt={settings.brand_name || 'ENG OSAMA'} />
       <img className="auth-brand-logo auth-brand-logo-dark" src="/eng-osama-logo-dark.png" alt="" aria-hidden="true" />
     </div>
-
-    <div className="auth-support">
-      <div><strong>{settings.support_title || 'خدمة العملاء'}</strong><span>{settings.support_hours || 'متاحون لمساعدتك عند الحاجة'}</span></div>
-      {settings.support_phone && <a href={`tel:${settings.support_phone}`}><Phone size={17}/><span>{settings.support_phone}</span></a>}
-      {settings.support_whatsapp && <a href={`https://wa.me/${settings.support_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"><MessageCircle size={17}/><span>واتساب</span></a>}
-      {settings.support_email && <a href={`mailto:${settings.support_email}`}><Mail size={17}/><span>{settings.support_email}</span></a>}
-      {!settings.support_phone && !settings.support_whatsapp && !settings.support_email && <p className="muted small" style={{margin:0}}>يمكنك إضافة أرقام التواصل والبريد من لوحة الإدارة.</p>}
+    <div className="auth-person-card">
+      <div className="auth-person-avatar">
+        {settings.instructor_image_url ? <img src={settings.instructor_image_url} alt={settings.instructor_name || 'صاحب المنصة'} /> : <span aria-hidden="true">م</span>}
+      </div>
+      <div className="auth-person-copy">
+        <span className="small">صاحب المنصة</span>
+        <strong>{settings.instructor_name || 'ENG OSAMA'}</strong>
+        <span>{settings.instructor_role || 'منصة تطوير وتعليم'}</span>
+      </div>
     </div>
-
-    <div className="auth-side-note">{settings.footer_text || 'تعلم مجانًا، بخطوات واضحة.'}</div>
+    <div className="auth-side-copy">
+      <span className="tag">{settings.hero_badge || 'منصة تطوير وتعليم'}</span>
+      <h2>{settings.public_welcome_title || 'أهلاً بيك في منصتك التعليمية'}</h2>
+      <p>{settings.public_welcome_description || 'منصة تساعدك على التعلم والتطبيق وبناء نسخة أقوى من نفسك بخطوات واضحة.'}</p>
+    </div>
   </aside>;
 }
-
 function PasswordField({ value, onChange, mode }: { value: string; onChange: (value: string) => void; mode: 'login'|'signup' }) {
   const [visible, setVisible] = useState(false);
   return <div className="password-field">

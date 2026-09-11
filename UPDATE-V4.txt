@@ -1,0 +1,14 @@
+ENG OSAMA V4 — LOGIN / BRAND UPDATE
+
+What changed:
+- Redesigned the login/signup screen to match the requested navy + gold premium composition.
+- Large ENG OSAMA logo is now the main visual instead of a small logo block.
+- Login form is placed in a clean right-side panel on desktop, with responsive mobile stacking.
+- Removed the feature/support list from the login visual (continuous support / clear goals / etc.).
+- Added a clear personal-profile area on the visual side. If the admin uploads a personal image from Admin > Site Settings, it appears here automatically; otherwise a neutral placeholder is shown.
+- Dark/light theme is supported by the existing ThemeProvider, including logo variants and form surfaces.
+- Fixed duplicated ENG OSAMA text in the top navbar.
+- Kept Supabase Auth, routes, and existing backend functionality intact.
+
+GitHub:
+Upload the CONTENTS of this archive to the repository root. Do not upload the ZIP itself and do not create a nested folder.

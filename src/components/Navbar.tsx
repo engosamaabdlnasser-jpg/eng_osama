@@ -40,7 +40,7 @@ export default function Navbar(){
   const brand = <><span className="brand-logo-wrap">{isDefaultLogo ? <><img src="/eng-osama-symbol-light.png" alt="" aria-hidden="true" className="brand-logo brand-logo-light"/><img src="/eng-osama-symbol-dark.png" alt="" aria-hidden="true" className="brand-logo brand-logo-dark"/></> : <img src={logoUrl} alt="" aria-hidden="true" className="brand-logo"/>}</span><span className="brand-name">{brandName}</span></>;
 
   return <header className="site-header"><div className="container navbar-inner">
-    <Link to="/" className="brand" onClick={close}>{brand}<span>{brandName}</span></Link>
+    <Link to="/" className="brand" onClick={close}>{brand}</Link>
     <nav className="desktop-nav">
       {profile && <><NavLink to="/courses">الكورسات</NavLink><NavLink to="/categories">التصنيفات</NavLink></>}
       {profile?.role === 'admin' && <NavLink to="/admin">الإدارة</NavLink>}

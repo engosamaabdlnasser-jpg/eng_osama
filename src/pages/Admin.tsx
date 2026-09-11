@@ -1,17 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { createCategory, deleteCategory, getAdminProfiles, getAllCourses, getCategories, getProfile, renameCategory, setUserRole } from '../services/data';
-import type { Category, Course, Profile } from '../types';
+import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo } from '../services/data';
+import type { Category, Course, HomeExtraSection, Profile, SiteSettings, StudentMonitorRow } from '../types';
+
+const emptyExtra: HomeExtraSection = { enabled: false, title: '', description: '', button_label: '', button_url: '' };
 
 export default function Admin() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [students, setStudents] = useState<StudentMonitorRow[]>([]);
+  const [settings, setSettings] = useState<SiteSettings>(defaultSiteSettings);
   const [newCat, setNewCat] = useState('');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+  const [tab, setTab] = useState<'overview'|'content'|'students'>('overview');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const nav = useNavigate();
 
   async function load() {
@@ -19,65 +25,58 @@ export default function Admin() {
     const { data } = await supabase.auth.getUser();
     if (!data.user) { nav('/login'); return; }
     const p = await getProfile(data.user.id);
-    if (p?.role !== 'admin') { setError('ليس لديك صلاحية للوصول إلى لوحة الإدارة.'); return; }
+    if (p?.role !== 'admin') { nav('/'); return; }
     setProfile(p);
-    const [c, k, u] = await Promise.all([getAllCourses(), getCategories(), getAdminProfiles()]);
-    setCourses(c); setCats(k); setUsers(u);
+    const [c, k, u, s, site] = await Promise.all([getAllCourses(), getCategories(), getAdminProfiles(), getStudentMonitorData(), getSiteSettings()]);
+    setCourses(c); setCats(k); setUsers(u); setStudents(s.filter(x=>x.role==='student')); setSettings(site);
   }
 
   useEffect(() => { load().catch(e => setError(e instanceof Error ? e.message : 'حدث خطأ')); }, [nav]);
 
-  async function togglePublished(course: Course) {
-    if (!supabase) return;
-    setError(''); setMsg('');
-    const { error } = await supabase.from('courses').update({ published: !course.published }).eq('id', course.id);
-    if (error) setError(error.message); else { setMsg(course.published ? 'تم إخفاء الكورس.' : 'تم نشر الكورس.'); setCourses(xs => xs.map(x => x.id === course.id ? { ...x, published: !x.published } : x)); }
-  }
+  async function togglePublished(course: Course) { if (!supabase) return; setError(''); setMsg(''); const { error } = await supabase.from('courses').update({ published: !course.published }).eq('id', course.id); if (error) setError(error.message); else { setMsg(course.published ? 'تم إخفاء الكورس.' : 'تم نشر الكورس.'); setCourses(xs => xs.map(x => x.id === course.id ? { ...x, published: !x.published } : x)); } }
+  async function removeCourse(course: Course) { if (!supabase || !confirm(`حذف الكورس «${course.title}»؟ سيتم حذف دروسه أيضًا.`)) return; const { error } = await supabase.from('courses').delete().eq('id', course.id); if (error) setError(error.message); else { setMsg('تم حذف الكورس.'); setCourses(xs => xs.filter(x => x.id !== course.id)); } }
+  async function addCategory(e: React.FormEvent) { e.preventDefault(); if (!newCat.trim()) return; try { const c = await createCategory(newCat); setCats(xs => [...xs, c].sort((a,b)=>a.name.localeCompare(b.name,'ar'))); setNewCat(''); setMsg('تمت إضافة التصنيف.'); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر إضافة التصنيف'); } }
+  async function editCategory(c: Category) { const name = prompt('اسم التصنيف الجديد:', c.name)?.trim(); if (!name || name===c.name) return; try { const updated=await renameCategory(c.id,name);setCats(xs=>xs.map(x=>x.id===c.id?updated:x));setMsg('تم تعديل التصنيف.'); } catch(e){setError(e instanceof Error?e.message:'تعذر تعديل التصنيف');} }
+  async function removeCategory(c: Category) { if(!confirm(`حذف التصنيف «${c.name}»؟`))return; try{await deleteCategory(c.id);setCats(x=>x.filter(item=>item.id!==c.id));setMsg('تم حذف التصنيف.')}catch(e){setError(e instanceof Error?e.message:'تعذر حذف التصنيف')} }
+  async function changeRole(u: Profile) { if(!supabase||!profile||u.id===profile.id){setError('لا يمكن تغيير صلاحية حسابك من هنا.');return;} const next=u.role==='admin'?'student':'admin'; if(!confirm(`تغيير صلاحية ${u.full_name||'هذا المستخدم'} إلى ${next==='admin'?'مدير':'طالب'}؟`))return; try{const updated=await setUserRole(u.id,next);setUsers(xs=>xs.map(x=>x.id===u.id?updated:x));setMsg('تم تحديث الصلاحية.');}catch(e){setError(e instanceof Error?e.message:'تعذر تحديث الصلاحية');} }
+  async function saveSettings(e: React.FormEvent){e.preventDefault();setError('');setMsg('');try{await saveSiteSettings(settings);setMsg('تم حفظ إعدادات الموقع.');}catch(e){setError(e instanceof Error?e.message:'تعذر حفظ الإعدادات');}}
+  async function handleLogoUpload(e: ChangeEvent<HTMLInputElement>){ const file=e.target.files?.[0]; if(!file) return; if(!file.type.startsWith('image/')){setError('اختر ملف صورة فقط.');return;} if(file.size>4*1024*1024){setError('حجم اللوجو يجب ألا يتجاوز 4MB.');return;} setUploadingLogo(true); setError(''); setMsg(''); try{const url=await uploadSiteLogo(file);setSettings(x=>({...x,logo_url:url}));setMsg('تم رفع اللوجو. اضغط حفظ إعدادات الموقع لتفعيله.');}catch(e){setError(e instanceof Error?e.message:'تعذر رفع اللوجو. تأكد من إعداد Storage في Supabase.');}finally{setUploadingLogo(false);}}
+  function updateExtra(index:number, patch:Partial<HomeExtraSection>){setSettings(s=>({...s,extra_sections:s.extra_sections.map((x,i)=>i===index?{...x,...patch}:x)}));}
+  function addExtra(){setSettings(s=>({...s,extra_sections:[...s.extra_sections,{...emptyExtra}]}));}
+  function removeExtra(index:number){setSettings(s=>({...s,extra_sections:s.extra_sections.filter((_,i)=>i!==index)}));}
 
-  async function removeCourse(course: Course) {
-    if (!supabase || !confirm(`حذف الكورس «${course.title}»؟ سيتم حذف دروسه أيضًا.`)) return;
-    const { error } = await supabase.from('courses').delete().eq('id', course.id);
-    if (error) setError(error.message); else { setMsg('تم حذف الكورس.'); setCourses(xs => xs.filter(x => x.id !== course.id)); }
-  }
+  const lessonsCount = useMemo(()=>courses.reduce((n,c)=>n+(c.lessons?.length??0),0),[courses]);
+  const averageCompletion = useMemo(()=>students.length?Math.round(students.reduce((n,s)=>n+s.completion_percent,0)/students.length):0,[students]);
+  const activeStudents = useMemo(()=>students.filter(s=>s.completed_lessons>0).length,[students]);
 
-  async function addCategory(e: React.FormEvent) {
-    e.preventDefault(); if (!newCat.trim()) return;
-    try { const c = await createCategory(newCat); setCats(xs => [...xs, c].sort((a,b) => a.name.localeCompare(b.name, 'ar'))); setNewCat(''); setMsg('تمت إضافة التصنيف.'); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر إضافة التصنيف'); }
-  }
-
-  async function editCategory(c: Category) {
-    const name = prompt('اسم التصنيف الجديد:', c.name)?.trim();
-    if (!name || name === c.name) return;
-    try { const updated = await renameCategory(c.id, name); setCats(xs => xs.map(x => x.id === c.id ? updated : x)); setMsg('تم تعديل التصنيف.'); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر تعديل التصنيف'); }
-  }
-
-  async function changeRole(u: Profile) {
-    if (!supabase || !profile || u.id === profile.id) { setError('لا يمكن تغيير صلاحية حسابك من هنا.'); return; }
-    const next = u.role === 'admin' ? 'student' : 'admin';
-    if (!confirm(`تغيير صلاحية ${u.full_name || 'هذا المستخدم'} إلى ${next === 'admin' ? 'مدير' : 'طالب'}؟`)) return;
-    try { const updated = await setUserRole(u.id, next); setUsers(xs => xs.map(x => x.id === u.id ? updated : x)); setMsg('تم تحديث الصلاحية.'); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر تحديث الصلاحية'); }
-  }
-
-  async function removeCategory(c: Category) {
-    if (!confirm(`حذف التصنيف «${c.name}»؟`)) return;
-    try { await deleteCategory(c.id); setCats(xs => xs.filter(x => x.id !== c.id)); setMsg('تم حذف التصنيف.'); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حذف التصنيف'); }
-  }
-
-  const lessonsCount = useMemo(() => courses.reduce((n, c) => n + (c.lessons?.length ?? 0), 0), [courses]);
   if (error && !profile) return <div className="container section"><div className="surface empty"><h1>لوحة الإدارة</h1><p className="error">{error}</p><Link className="btn btn-primary" to="/">العودة للرئيسية</Link></div></div>;
 
   return <section className="section"><div className="container">
-    <div className="section-head"><div><span className="tag">Admin</span><h1 className="section-title">لوحة التحكم</h1><p className="muted">مرحبًا {profile?.full_name || 'Admin'} — كل إدارة المنصة من هنا.</p></div><Link className="btn btn-primary" to="/admin/courses/new">إضافة كورس</Link></div>
-    {error && <div className="error" style={{marginBottom:12}}>{error}</div>}{msg && <div className="notice" style={{marginBottom:12}}>{msg}</div>}
-    <div className="grid admin-stats"><div className="surface stat"><span className="muted">المستخدمون</span><strong>{users.length}</strong></div><div className="surface stat"><span className="muted">الكورسات</span><strong>{courses.length}</strong></div><div className="surface stat"><span className="muted">الدروس</span><strong>{lessonsCount}</strong></div><div className="surface stat"><span className="muted">التصنيفات</span><strong>{cats.length}</strong></div></div>
+    <div className="section-head"><div><span className="tag">Admin</span><h1 className="section-title">لوحة التحكم</h1><p className="muted">مرحبًا {profile?.full_name||'Admin'} — إدارة المنصة من مكان واحد.</p></div><Link className="btn btn-primary" to="/admin/courses/new">إضافة كورس</Link></div>
+    <div className="admin-tabs"><button className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}>نظرة عامة</button><button className={tab==='content'?'active':''} onClick={()=>setTab('content')}>إعدادات الموقع</button><button className={tab==='students'?'active':''} onClick={()=>setTab('students')}>مراقبة الطلاب</button></div>
+    {error&&<div className="error" style={{marginBottom:12}}>{error}</div>}{msg&&<div className="notice" style={{marginBottom:12}}>{msg}</div>}
 
-    <div className="admin-columns">
-      <div className="surface table-wrap"><div className="admin-panel-head"><div><h2>الكورسات</h2><p className="muted">إضافة، تعديل، نشر أو إخفاء وحذف.</p></div></div><table className="table"><thead><tr><th>الكورس</th><th>الحالة</th><th>الدروس</th><th>إجراء</th></tr></thead><tbody>{courses.map(c => <tr key={c.id}><td><strong>{c.title}</strong><div className="muted small">{c.category?.name || 'بدون تصنيف'}</div></td><td><button className="status-button" onClick={() => togglePublished(c)}>{c.published ? 'منشور' : 'مخفي'}</button></td><td>{c.lessons?.length ?? 0}</td><td><div className="rtl-row"><Link className="btn btn-ghost" to={`/admin/courses/${c.id}/edit`}>تعديل</Link><button className="btn btn-danger" onClick={() => removeCourse(c)}>حذف</button></div></td></tr>)}</tbody></table>{!courses.length && <div className="empty">لا توجد كورسات بعد.</div>}</div>
+    {tab==='overview'&&<>
+      <div className="grid admin-stats"><div className="surface stat"><span className="muted">المستخدمون</span><strong>{users.length}</strong></div><div className="surface stat"><span className="muted">الكورسات</span><strong>{courses.length}</strong></div><div className="surface stat"><span className="muted">الدروس</span><strong>{lessonsCount}</strong></div><div className="surface stat"><span className="muted">متوسط تقدم الطلاب</span><strong>{averageCompletion}%</strong></div></div>
+      <div className="admin-columns"><div className="surface table-wrap"><div className="admin-panel-head"><div><h2>الكورسات</h2><p className="muted">إضافة، تعديل، نشر أو إخفاء وحذف.</p></div></div><table className="table"><thead><tr><th>الكورس</th><th>الحالة</th><th>الدروس</th><th>إجراء</th></tr></thead><tbody>{courses.map(c=><tr key={c.id}><td><strong>{c.title}</strong><div className="muted small">{c.category?.name||'بدون تصنيف'}</div></td><td><button className="status-button" onClick={()=>togglePublished(c)}>{c.published?'منشور':'مخفي'}</button></td><td>{c.lessons?.length??0}</td><td><div className="rtl-row"><Link className="btn btn-ghost" to={`/admin/courses/${c.id}/edit`}>تعديل</Link><button className="btn btn-danger" onClick={()=>removeCourse(c)}>حذف</button></div></td></tr>)}</tbody></table>{!courses.length&&<div className="empty">لا توجد كورسات بعد.</div>}</div>
+        <div className="grid" style={{gap:18}}><div className="surface admin-panel"><div className="admin-panel-head"><div><h2>التصنيفات</h2><p className="muted">تحكم سريع في المجالات.</p></div></div><form className="rtl-row" onSubmit={addCategory}><input className="input" value={newCat} onChange={e=>setNewCat(e.target.value)} placeholder="اسم التصنيف" required/><button className="btn btn-primary">إضافة</button></form><div className="admin-list">{cats.map(c=><div className="admin-list-row" key={c.id}><strong>{c.name}</strong><div className="rtl-row"><button className="btn btn-ghost" onClick={()=>editCategory(c)}>تعديل</button><button className="btn btn-danger" onClick={()=>removeCategory(c)}>حذف</button></div></div>)}</div></div>
+          <div className="surface admin-panel"><div className="admin-panel-head"><div><h2>المستخدمون</h2><p className="muted">الحسابات المسجلة وصلاحياتها.</p></div></div><div className="admin-list">{users.slice(0,12).map(u=><div className="admin-list-row" key={u.id}><div><strong>{u.full_name||'بدون اسم'}</strong><div className="muted small">{u.role==='admin'?'مدير':'طالب'}</div></div><div className="rtl-row"><span className="tag">{u.role}</span>{u.id!==profile?.id&&<button className="btn btn-ghost" onClick={()=>changeRole(u)}>{u.role==='admin'?'جعله طالبًا':'جعله مديرًا'}</button>}</div></div>)}</div>{users.length>12&&<p className="muted small">عرض أول 12 مستخدمًا.</p>}</div>
+        </div></div>
+    </>}
 
-      <div className="grid" style={{gap:18}}>
-        <div className="surface admin-panel"><div className="admin-panel-head"><div><h2>التصنيفات</h2><p className="muted">تحكم سريع في المجالات.</p></div></div><form className="rtl-row" onSubmit={addCategory}><input className="input" value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="اسم التصنيف" required/><button className="btn btn-primary">إضافة</button></form><div className="admin-list">{cats.map(c => <div className="admin-list-row" key={c.id}><strong>{c.name}</strong><div className="rtl-row"><button className="btn btn-ghost" onClick={() => editCategory(c)}>تعديل</button><button className="btn btn-danger" onClick={() => removeCategory(c)}>حذف</button></div></div>)}</div></div>
-        <div className="surface admin-panel"><div className="admin-panel-head"><div><h2>المستخدمون</h2><p className="muted">الحسابات المسجلة وصلاحياتها.</p></div></div><div className="admin-list">{users.slice(0, 12).map(u => <div className="admin-list-row" key={u.id}><div><strong>{u.full_name || 'بدون اسم'}</strong><div className="muted small">{u.role === 'admin' ? 'مدير' : 'طالب'}</div></div><div className="rtl-row"><span className="tag">{u.role}</span>{u.id !== profile?.id && <button className="btn btn-ghost" onClick={() => changeRole(u)}>{u.role === 'admin' ? 'جعله طالبًا' : 'جعله مديرًا'}</button>}</div></div>)}</div>{users.length > 12 && <p className="muted small">عرض أول 12 مستخدمًا.</p>}</div>
-      </div>
-    </div>
+    {tab==='content'&&<form className="surface form-grid" style={{padding:24}} onSubmit={saveSettings}>
+      <div className="admin-form-note"><strong>إدارة كاملة للمظهر والمحتوى الظاهر للزائر</strong><span className="muted">غير اللوجو والنصوص والأقسام من هنا، بدون تعديل الكود.</span></div>
+      <div className="settings-block"><h2>الهوية</h2><div className="two-col"><div><label className="label">اسم المنصة</label><input className="input" value={settings.brand_name} onChange={e=>setSettings({...settings,brand_name:e.target.value})}/></div><div><label className="label">رفع اللوجو من جهازك</label><input className="input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo}/><div className="muted small" style={{marginTop:6}}>{uploadingLogo?'جاري رفع اللوجو...':'حتى 4MB — ثم اضغط حفظ'}</div></div></div><div className="logo-preview-row"><div className="logo-preview-box">{settings.logo_url?<img src={settings.logo_url} alt="معاينة اللوجو"/>:<span>لا يوجد لوجو</span>}</div><div><div className="muted small">رابط اللوجو الحالي</div><div className="small" style={{wordBreak:'break-all'}}>{settings.logo_url||'—'}</div></div></div></div>
+      <div className="settings-block"><h2>الهيدر والشريط العلوي</h2><div className="two-col"><div><label className="label">نص الشريط العلوي</label><input className="input" value={settings.announcement} onChange={e=>setSettings({...settings,announcement:e.target.value})} placeholder="اتركه فارغًا لإخفائه"/></div><div className="check-row"><label className="check"><input type="checkbox" checked={settings.show_categories} onChange={e=>setSettings({...settings,show_categories:e.target.checked})}/> عرض التصنيفات في الرئيسية</label><label className="check"><input type="checkbox" checked={settings.show_featured} onChange={e=>setSettings({...settings,show_featured:e.target.checked})}/> عرض أحدث الكورسات</label></div></div></div>
+      <div className="settings-block"><h2>القسم الرئيسي</h2><div><label className="label">عنوان البطل</label><input className="input" value={settings.hero_badge} onChange={e=>setSettings({...settings,hero_badge:e.target.value})}/></div><div><label className="label">العنوان الرئيسي</label><textarea className="input" rows={3} value={settings.hero_title} onChange={e=>setSettings({...settings,hero_title:e.target.value})}/></div><div><label className="label">وصف الصفحة الرئيسية</label><textarea className="input" rows={4} value={settings.hero_description} onChange={e=>setSettings({...settings,hero_description:e.target.value})}/></div><div className="two-col"><div><label className="label">زر أساسي</label><input className="input" value={settings.primary_cta_label} onChange={e=>setSettings({...settings,primary_cta_label:e.target.value})}/></div><div><label className="label">زر ثانوي</label><input className="input" value={settings.secondary_cta_label} onChange={e=>setSettings({...settings,secondary_cta_label:e.target.value})}/></div></div></div>
+      <div className="settings-block"><h2>التصنيفات والكورسات</h2><div className="two-col"><div><label className="label">عنوان التصنيفات</label><input className="input" value={settings.categories_title} onChange={e=>setSettings({...settings,categories_title:e.target.value})}/></div><div><label className="label">وصف التصنيفات</label><input className="input" value={settings.categories_description} onChange={e=>setSettings({...settings,categories_description:e.target.value})}/></div></div><div className="two-col"><div><label className="label">عنوان أحدث الكورسات</label><input className="input" value={settings.featured_title} onChange={e=>setSettings({...settings,featured_title:e.target.value})}/></div><div><label className="label">وصف أحدث الكورسات</label><input className="input" value={settings.featured_description} onChange={e=>setSettings({...settings,featured_description:e.target.value})}/></div></div><div><label className="label">نص الفوتر</label><input className="input" value={settings.footer_text} onChange={e=>setSettings({...settings,footer_text:e.target.value})}/></div></div>
+      <div className="settings-block"><div className="section-head" style={{marginBottom:12}}><div><h2 style={{margin:0}}>إضافاتك للصفحة الرئيسية</h2><p className="muted" style={{margin:'4px 0 0'}}>أنشئ أقسامًا إضافية بدون كود.</p></div><button type="button" className="btn btn-ghost" onClick={addExtra}>+ إضافة قسم</button></div>{settings.extra_sections.length===0&&<div className="empty compact">لا توجد أقسام إضافية. اضغط «إضافة قسم» لإنشاء قسم جديد.</div>}{settings.extra_sections.map((x,i)=><div className="extra-editor" key={i}><div className="rtl-row" style={{justifyContent:'space-between'}}><label className="check"><input type="checkbox" checked={x.enabled} onChange={e=>updateExtra(i,{enabled:e.target.checked})}/> عرض هذا القسم</label><button type="button" className="btn btn-danger" onClick={()=>removeExtra(i)}>حذف القسم</button></div><div className="two-col"><div><label className="label">عنوان القسم</label><input className="input" value={x.title} onChange={e=>updateExtra(i,{title:e.target.value})}/></div><div><label className="label">نص الزر</label><input className="input" value={x.button_label} onChange={e=>updateExtra(i,{button_label:e.target.value})}/></div></div><div><label className="label">الوصف</label><textarea className="input" rows={3} value={x.description} onChange={e=>updateExtra(i,{description:e.target.value})}/></div><div><label className="label">رابط الزر</label><input className="input" value={x.button_url} onChange={e=>updateExtra(i,{button_url:e.target.value})} placeholder="مثال: /courses أو https://..."/></div></div>)}</div>
+      <div className="settings-actions"><button className="btn btn-primary" disabled={uploadingLogo}>حفظ كل إعدادات الموقع</button><span className="muted small">التغييرات تنعكس على الموقع بعد الحفظ وإعادة تحميل الصفحة إذا كانت مفتوحة بالفعل.</span></div>
+    </form>}
+
+    {tab==='students'&&<>
+      <div className="grid admin-stats"><div className="surface stat"><span className="muted">إجمالي الطلاب</span><strong>{students.length}</strong></div><div className="surface stat"><span className="muted">طلاب بدأوا التعلم</span><strong>{activeStudents}</strong></div><div className="surface stat"><span className="muted">متوسط التقدم</span><strong>{averageCompletion}%</strong></div><div className="surface stat"><span className="muted">إجمالي المستخدمين</span><strong>{users.length}</strong></div></div>
+      <div className="surface table-wrap"><div className="admin-panel-head"><div><h2>لوحة مراقبة الطلاب</h2><p className="muted">متابعة النشاط والتقدم وآخر إنجاز لكل طالب.</p></div></div><table className="table"><thead><tr><th>الطالب</th><th>تاريخ التسجيل</th><th>الدروس المكتملة</th><th>الكورسات التي بدأها</th><th>التقدم</th><th>آخر نشاط</th></tr></thead><tbody>{students.map(s=><tr key={s.user_id}><td><strong>{s.full_name||'بدون اسم'}</strong></td><td>{new Date(s.created_at).toLocaleDateString('ar-EG')}</td><td>{s.completed_lessons}</td><td>{s.started_courses}</td><td><div className="progress-cell"><div className="progress-bar"><span style={{width:`${Math.min(100,Math.max(0,s.completion_percent))}%`}}/></div><strong>{s.completion_percent}%</strong></div></td><td>{s.last_completed_at?new Date(s.last_completed_at).toLocaleString('ar-EG'):'لم يبدأ بعد'}</td></tr>)}</tbody></table>{!students.length&&<div className="empty">لا يوجد طلاب مسجلون بعد.</div>}</div>
+    </>}
   </div></section>;
 }

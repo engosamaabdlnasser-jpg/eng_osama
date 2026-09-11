@@ -1,2 +1,11 @@
-import {Outlet,Link} from 'react-router-dom'; import Navbar from '../components/Navbar';
-export default function AppLayout(){return <><Navbar/><main><Outlet/></main><footer style={{borderTop:'1px solid #e2e8f0',background:'#fff',padding:'30px 0',marginTop:40}}><div className="container" style={{display:'flex',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}><strong>ENG OSAMA</strong><span className="muted">تعلم مجانًا، بخطوات واضحة.</span><Link className="muted" to="/admin">الإدارة</Link></div></footer></>}
+import { Outlet, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import Navbar from '../components/Navbar';
+import { getSiteSettings } from '../services/data';
+
+export default function AppLayout(){
+  const [footerText, setFooterText] = useState('تعلم مجانًا، بخطوات واضحة.');
+  const [brandName, setBrandName] = useState('ENG OSAMA');
+  useEffect(()=>{getSiteSettings().then(s=>{setFooterText(s.footer_text);setBrandName(s.brand_name || 'ENG OSAMA');}).catch(()=>{});},[]);
+  return <><Navbar/><main><Outlet/></main><footer className="site-footer"><div className="container footer-inner"><Link to="/"><strong>{brandName}</strong></Link><span className="muted">{footerText}</span></div></footer></>;
+}

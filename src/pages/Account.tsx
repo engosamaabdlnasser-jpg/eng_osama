@@ -27,7 +27,7 @@ export default function Account() {
     let active = true;
     async function load() {
       if (!supabase) {
-        setProfile({ id: 'demo', full_name: 'زائر', avatar_url: null, role: 'student' });
+        setProfile({ id: 'demo', full_name: 'زائر', phone: null, age: null, avatar_url: null, role: 'student' });
         setName('زائر'); setAvatarUrl(null);
         return;
       }
@@ -64,7 +64,7 @@ export default function Account() {
     if (!supabase || !profile || profile.id === 'demo') return;
     setSaving(true);
     try {
-      const updated = await updateProfileDetails(profile.id, name, avatarUrl);
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl, profile.phone, profile.age);
       setProfile(updated);
       setMsg('تم حفظ بيانات الملف الشخصي.');
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حفظ الاسم.'); }
@@ -74,7 +74,7 @@ export default function Account() {
   async function uploadAvatar(file?: File) {
     if (!file || !profile || profile.id === 'demo') return;
     setError(''); setMsg(''); setAvatarBusy(true);
-    try { const url = await uploadProfileAvatar(profile.id, file); const updated = await updateProfileDetails(profile.id, name, url); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
+    try { const url = await uploadProfileAvatar(profile.id, file); const updated = await updateProfileDetails(profile.id, name, url, profile.phone, profile.age); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
     catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الصورة.'); }
     finally { setAvatarBusy(false); }
   }

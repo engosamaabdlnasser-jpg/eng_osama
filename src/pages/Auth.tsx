@@ -137,6 +137,8 @@ export function ProfileSetup() {
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [age, setAge] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -157,6 +159,8 @@ export function ProfileSetup() {
         setEmail(data.user.email || '');
         setProfile(currentProfile);
         setName(currentProfile?.full_name || '');
+        setPhone(currentProfile?.phone || '');
+        setAge(currentProfile?.age != null ? String(currentProfile.age) : '');
         setAvatarUrl(currentProfile?.avatar_url || null);
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : 'تعذر تحميل معلومات حسابك.');
@@ -183,7 +187,13 @@ export function ProfileSetup() {
     if (!supabase || !profile) { nav('/account'); return; }
     setSaving(true);
     try {
-      const updated = await updateProfileDetails(profile.id, name, avatarUrl);
+      const parsedAge = age.trim() ? Number(age) : null;
+      if (parsedAge !== null && (!Number.isInteger(parsedAge) || parsedAge < 5 || parsedAge > 100)) {
+        setError('العمر يجب أن يكون رقمًا صحيحًا بين 5 و100 سنة.');
+        setSaving(false);
+        return;
+      }
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge);
       setProfile(updated);
       setMsg('تم حفظ معلوماتك بنجاح.');
       window.setTimeout(() => nav('/account'), 450);
@@ -212,6 +222,10 @@ export function ProfileSetup() {
           </div>
           <div className="form-grid">
             <div><label className="label" htmlFor="profile-name">الاسم الكامل</label><input id="profile-name" className="input" autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="اكتب اسمك الكامل" /></div>
+            <div className="profile-setup-two-col">
+              <div><label className="label" htmlFor="profile-phone">رقم الهاتف</label><input id="profile-phone" className="input" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="01xxxxxxxxx" /></div>
+              <div><label className="label" htmlFor="profile-age">العمر</label><input id="profile-age" className="input" type="number" inputMode="numeric" min="5" max="100" value={age} onChange={e => setAge(e.target.value)} placeholder="مثال: 20" /></div>
+            </div>
             <div><label className="label" htmlFor="profile-email">البريد الإلكتروني</label><input id="profile-email" className="input" value={email} readOnly aria-describedby="profile-email-note" /><span id="profile-email-note" className="small muted">البريد مرتبط بحسابك ولا يتم تغييره من هذه الخطوة.</span></div>
           </div>
         </div>

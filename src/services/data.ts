@@ -119,9 +119,11 @@ export async function uploadSiteLogo(file: File) {
   return data.publicUrl;
 }
 
-export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null) {
+export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null, phone: string | null = null, age: number | null = null) {
   if (!supabase) throw new Error('Supabase غير مربوط.');
-  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl }).eq('id', id).select().single();
+  const normalizedPhone = phone?.trim() || null;
+  const normalizedAge = age === null || age === undefined || Number.isNaN(age) ? null : age;
+  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl, phone: normalizedPhone, age: normalizedAge }).eq('id', id).select().single();
   if (error) throw error;
   return data as Profile;
 }

@@ -9,7 +9,7 @@ import { useTheme } from './ThemeProvider';
 export default function Navbar(){
   const [open,setOpen]=useState(false);
   const [profile,setProfile]=useState<Profile|null>(null);
-  const [logoUrl,setLogoUrl]=useState('/logo.png');
+  const [logoUrl,setLogoUrl]=useState('/eng-osama-symbol-light.png');
   const [brandName,setBrandName]=useState('ENG OSAMA');
   const { theme, toggleTheme } = useTheme();
 
@@ -18,7 +18,7 @@ export default function Navbar(){
     async function load(){
       try{
         const site = await getSiteSettings();
-        if (active) { setLogoUrl(site.logo_url || '/logo.png'); setBrandName(site.brand_name || 'ENG OSAMA'); }
+        if (active) { setLogoUrl(site.logo_url || '/eng-osama-symbol-light.png'); setBrandName(site.brand_name || 'ENG OSAMA'); }
         if (!supabase) return;
         const { data } = await supabase.auth.getUser();
         if (data.user) {
@@ -36,7 +36,8 @@ export default function Navbar(){
   },[]);
 
   const close = () => setOpen(false);
-  const brand = logoUrl ? <img src={logoUrl} alt={brandName} className="brand-logo"/> : <span className="brand-mark">E</span>;
+  const isDefaultLogo = !logoUrl || logoUrl === '/logo.png' || logoUrl === '/eng-osama-symbol-light.png';
+  const brand = <><span className="brand-logo-wrap">{isDefaultLogo ? <><img src="/eng-osama-symbol-light.png" alt="" aria-hidden="true" className="brand-logo brand-logo-light"/><img src="/eng-osama-symbol-dark.png" alt="" aria-hidden="true" className="brand-logo brand-logo-dark"/></> : <img src={logoUrl} alt="" aria-hidden="true" className="brand-logo"/>}</span><span className="brand-name">{brandName}</span></>;
 
   return <header className="site-header"><div className="container navbar-inner">
     <Link to="/" className="brand" onClick={close}>{brand}<span>{brandName}</span></Link>

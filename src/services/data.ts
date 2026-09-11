@@ -29,6 +29,16 @@ export const defaultSiteSettings: SiteSettings = {
   show_categories: true,
   show_featured: true,
   extra_sections: [],
+  public_welcome_title: 'أهلاً بيك في منصتك التعليمية',
+  public_welcome_description: 'سجّل دخولك للوصول إلى الكورسات والدروس ومتابعة تقدمك خطوة بخطوة.',
+  instructor_name: 'ENG OSAMA',
+  instructor_role: 'منصة تعليمية',
+  instructor_image_url: '',
+  support_title: 'خدمة العملاء',
+  support_phone: '',
+  support_whatsapp: '',
+  support_email: '',
+  support_hours: 'متاحون لمساعدتك عند الحاجة',
 };
 
 export async function getCourses(): Promise<Course[]> { if (!supabase) { if (DEMO_MODE) return demoCourses; throw new Error('قاعدة البيانات غير متصلة. تأكد من إعداد متغيرات Supabase.'); } const { data,error }=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('published',true).order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
@@ -80,6 +90,18 @@ export async function updateProfileDetails(id: string, fullName: string, avatarU
   const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl }).eq('id', id).select().single();
   if (error) throw error;
   return data as Profile;
+}
+
+
+export async function uploadSiteInstructorImage(file: File) {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  if (!file.type.startsWith('image/')) throw new Error('اختر ملف صورة فقط.');
+  if (file.size > 4 * 1024 * 1024) throw new Error('حجم الصورة يجب ألا يتجاوز 4MB.');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `brand/instructor-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('site-assets').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl;
 }
 
 export async function uploadProfileAvatar(userId: string, file: File) {

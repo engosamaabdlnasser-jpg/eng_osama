@@ -89,3 +89,17 @@ language sql stable security definer set search_path=public as $$
 $$;
 revoke all on function public.admin_student_monitor() from public;
 grant execute on function public.admin_student_monitor() to authenticated;
+
+
+-- Protect the educational catalog from anonymous visitors. Marketing/site settings remain public.
+drop policy if exists "public read categories" on public.categories;
+create policy "authenticated read categories" on public.categories
+for select to authenticated using (true);
+
+drop policy if exists "public read published courses" on public.courses;
+create policy "authenticated read published courses" on public.courses
+for select to authenticated using (published=true or public.is_admin());
+
+drop policy if exists "public read published lessons" on public.lessons;
+create policy "authenticated read published lessons" on public.lessons
+for select to authenticated using (exists(select 1 from public.courses c where c.id=course_id and (c.published=true or public.is_admin())));

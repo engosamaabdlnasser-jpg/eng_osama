@@ -91,6 +91,15 @@ export const defaultSiteSettings: SiteSettings = {
     announcement_height: 'auto',
   },
   custom_css: '',
+  component_editor: {
+    'global.header': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'20px',gap:'18px',padding:'0px',border_radius:'0px',shadow:'none'},
+    'home.hero': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'20px',gap:'18px',padding:'0px',border_radius:'0px',shadow:'none'},
+    'home.categories': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'28px',gap:'18px',padding:'20px',border_radius:'20px',shadow:'none'},
+    'home.featured': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'20px',gap:'18px',padding:'20px',border_radius:'20px',shadow:'none'},
+    'categories.header': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'20px',gap:'18px',padding:'0px',border_radius:'0px',shadow:'none'},
+    'categories.grid': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'28px',gap:'18px',padding:'20px',border_radius:'20px',shadow:'none'},
+    'global.footer': {visible:true,offset_x:'0px',offset_y:'0px',width:'auto',height:'auto',scale:'1',font_size:'inherit',icon_size:'20px',gap:'18px',padding:'30px 0',border_radius:'0px',shadow:'none'},
+  },
 };
 
 export async function getCourses(): Promise<Course[]> { if (!supabase) { if (DEMO_MODE) return demoCourses; throw new Error('قاعدة البيانات غير متصلة. تأكد من إعداد متغيرات Supabase.'); } const { data,error }=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('published',true).order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
@@ -118,6 +127,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     ...raw,
     extra_sections: Array.isArray(raw.extra_sections) ? raw.extra_sections : defaultSiteSettings.extra_sections,
     ui_controls: { ...defaultSiteSettings.ui_controls, ...(raw.ui_controls || {}) },
+    component_editor: { ...defaultSiteSettings.component_editor, ...(raw.component_editor || {}) },
   } as SiteSettings;
 }
 

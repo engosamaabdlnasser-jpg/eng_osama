@@ -20,6 +20,7 @@ export default function Admin() {
   const [msg, setMsg] = useState('');
   const [tab, setTab] = useState<'overview'|'content'|'visual'|'assets'|'students'>('overview');
   const [visualTarget, setVisualTarget] = useState('header');
+  const [componentTarget, setComponentTarget] = useState('home.hero');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingInstructor, setUploadingInstructor] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -114,6 +115,23 @@ export default function Admin() {
     return `${(bytes/(1024*1024)).toFixed(2)} MB`;
   }
 
+  const componentOptions = [
+    ['home.hero','الرئيسية / القسم الرئيسي','العنوان والوصف والأزرار'],
+    ['home.categories','الرئيسية / التصنيفات','شبكة التصنيفات'],
+    ['home.featured','الرئيسية / أحدث الكورسات','شبكة الكورسات'],
+    ['categories.header','التصنيفات / العنوان','عنوان صفحة التصنيفات'],
+    ['categories.grid','التصنيفات / الشبكة','بطاقات التصنيفات'],
+    ['global.header','عام / الهيدر','الهيدر والتنقل'],
+    ['global.footer','عام / الفوتر','الفوتر'],
+  ] as const;
+  function updateComponent(key:string, patch:Partial<import('../types').ComponentStyle>){
+    setSettings(s=>({ ...s, component_editor: { ...s.component_editor, [key]: { ...s.component_editor[key], ...patch } } }));
+  }
+  function resetComponent(key:string){
+    if(!confirm('إرجاع إعدادات هذا العنصر للوضع الافتراضي؟')) return;
+    setSettings(s=>({ ...s, component_editor: { ...s.component_editor, [key]: { ...defaultSiteSettings.component_editor[key] } } }));
+  }
+
   function resetDesign(){ if(!confirm('إرجاع إعدادات الألوان والخط والشكل للقيم الافتراضية؟'))return; setSettings(s=>({...s,font_family:defaultSiteSettings.font_family,light_bg:defaultSiteSettings.light_bg,light_surface:defaultSiteSettings.light_surface,light_text:defaultSiteSettings.light_text,light_muted:defaultSiteSettings.light_muted,light_border:defaultSiteSettings.light_border,light_accent:defaultSiteSettings.light_accent,light_accent_soft:defaultSiteSettings.light_accent_soft,dark_bg:defaultSiteSettings.dark_bg,dark_surface:defaultSiteSettings.dark_surface,dark_text:defaultSiteSettings.dark_text,dark_muted:defaultSiteSettings.dark_muted,dark_border:defaultSiteSettings.dark_border,dark_accent:defaultSiteSettings.dark_accent,dark_accent_soft:defaultSiteSettings.dark_accent_soft,ui_radius:defaultSiteSettings.ui_radius,ui_shadow:defaultSiteSettings.ui_shadow,ui_controls:defaultSiteSettings.ui_controls,custom_css:''})); setMsg('تم تجهيز القيم الافتراضية. اضغط حفظ لتطبيقها.'); }
 
 
@@ -143,6 +161,23 @@ export default function Admin() {
     </>}
 
     {tab==='visual'&&<form className="surface form-grid visual-editor" style={{padding:24}} onSubmit={saveSettings}>
+      <div className="component-editor">
+        <div className="visual-editor-head"><div><span className="tag">V11 • Page / Component Editor</span><h2>محرر الصفحات والعناصر</h2><p className="muted">اختر الصفحة والعنصر ثم عدّل مكانه وحجمه وشكله. هذه التعديلات تخص واجهة المنصة وتُحفظ مع إعدادات الموقع.</p></div><div className="visual-editor-badge">Admin only</div></div>
+        <div className="component-editor-layout">
+          <aside className="visual-targets" aria-label="الصفحات والعناصر">{componentOptions.map(([key,title,desc])=><button type="button" key={key} className={`visual-target ${componentTarget===key?'active':''}`} onClick={()=>setComponentTarget(key)}><strong>{title}</strong><span>{desc}</span></button>)}</aside>
+          <div className="visual-editor-panel">
+            <h3>{componentOptions.find(x=>x[0]===componentTarget)?.[1] || 'العنصر'}</h3>
+            <p className="muted small">التحكم يتم على العنصر نفسه، وليس على الكود. اترك القيمة كما هي إذا لم تكن تريد تغييرها.</p>
+            {(() => { const c=settings.component_editor?.[componentTarget] || defaultSiteSettings.component_editor[componentTarget]; return <><label className="check"><input type="checkbox" checked={c.visible!==false} onChange={e=>updateComponent(componentTarget,{visible:e.target.checked})}/> إظهار العنصر</label>
+              <div className="two-col">
+                {[['offset_x','تحريك أفقي'],['offset_y','تحريك رأسي'],['width','العرض'],['height','الارتفاع'],['scale','الحجم / Scale'],['font_size','حجم الخط'],['icon_size','حجم الأيقونة'],['gap','المسافة بين العناصر'],['padding','الحشو الداخلي'],['border_radius','نصف قطر الحواف'],['shadow','الظل']].map(([key,label])=><div key={key}><label className="label">{label}</label><input className="input" value={(c as any)[key] ?? ''} onChange={e=>updateComponent(componentTarget,{[key]:e.target.value} as any)} placeholder={String((defaultSiteSettings.component_editor[componentTarget] as any)?.[key] ?? '')}/></div>)}
+              </div>
+              <div className="component-editor-actions"><button type="button" className="btn btn-ghost" onClick={()=>resetComponent(componentTarget)}>إرجاع هذا العنصر</button><span className="muted small">المعاينة الحية تتأثر بعد الحفظ وإعادة تحميل الصفحة.</span></div>
+            </> })()}
+          </div>
+        </div>
+      </div>
+
       <div className="visual-editor-head"><div><span className="tag">V9 • Admin only</span><h2>المحرر البصري</h2><p className="muted">غيّر شكل العناصر الأساسية من لوحة الإدارة بدون تعديل الكود. التغييرات تُحفظ داخل إعدادات الموقع وتظهر على المنصة.</p></div><div className="visual-editor-badge">Design System</div></div>
       <div className="visual-editor-layout">
         <aside className="visual-targets" aria-label="العناصر القابلة للتعديل">

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { getProfile, getSiteSettings } from '../services/data';
 import type { Profile } from '../types';
 import { useTheme } from './ThemeProvider';
+import { componentStyle } from './EditableRegion';
 
 export default function Navbar(){
   const [open,setOpen]=useState(false);
@@ -12,13 +13,14 @@ export default function Navbar(){
   const [logoUrl,setLogoUrl]=useState('/eng-osama-symbol-light.png');
   const [brandName,setBrandName]=useState('ENG OSAMA');
   const { theme, toggleTheme } = useTheme();
+  const [siteSettings,setSiteSettings] = useState<any>(null);
 
   useEffect(()=>{
     let active = true;
     async function load(){
       try{
         const site = await getSiteSettings();
-        if (active) { setLogoUrl(site.logo_url || '/eng-osama-symbol-light.png'); setBrandName(site.brand_name || 'ENG OSAMA'); }
+        if (active) { setLogoUrl(site.logo_url || '/eng-osama-symbol-light.png'); setBrandName(site.brand_name || 'ENG OSAMA'); setSiteSettings(site); }
         if (!supabase) return;
         const { data } = await supabase.auth.getUser();
         if (data.user) {
@@ -39,7 +41,8 @@ export default function Navbar(){
   const isDefaultLogo = !logoUrl || logoUrl === '/logo.png' || logoUrl === '/eng-osama-symbol-light.png';
   const brand = <><span className="brand-logo-wrap">{isDefaultLogo ? <><img src="/eng-osama-symbol-light.png" alt="" aria-hidden="true" className="brand-logo brand-logo-light"/><img src="/eng-osama-symbol-dark.png" alt="" aria-hidden="true" className="brand-logo brand-logo-dark"/></> : <img src={logoUrl} alt="" aria-hidden="true" className="brand-logo"/>}</span><span className="brand-name">{brandName}</span></>;
 
-  return <header className="site-header"><div className="container navbar-inner">
+  const headerStyle = componentStyle((siteSettings as any)?.component_editor?.['global.header']);
+  return <header className="site-header" style={headerStyle}><div className="container navbar-inner">
     <Link to="/" className="brand" onClick={close}>{brand}</Link>
     <nav className="desktop-nav">
       {profile && <><NavLink to="/courses">الكورسات</NavLink><NavLink to="/categories">التصنيفات</NavLink></>}

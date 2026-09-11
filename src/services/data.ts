@@ -128,6 +128,60 @@ export async function saveSiteSettings(settings: SiteSettings) {
   return data;
 }
 
+export type ManagedSiteAsset = { path: string; name: string; folder: string; size: number; created_at: string | null; updated_at: string | null; url: string; };
+
+async function listStorageFolder(folder: string): Promise<ManagedSiteAsset[]> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.storage.from('site-assets').list(folder, { limit: 100, offset: 0, sortBy: { column: 'created_at', order: 'desc' } });
+  if (error) throw error;
+  const out: ManagedSiteAsset[] = [];
+  for (const item of data ?? []) {
+    if (!item.name) continue;
+    const path = folder ? `${folder}/${item.name}` : item.name;
+    const isFolder = !item.metadata;
+    if (isFolder) {
+      const nested = await listStorageFolder(path);
+      out.push(...nested);
+      continue;
+    }
+    const url = supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl;
+    out.push({
+      path,
+      name: item.name,
+      folder: folder || 'root',
+      size: Number(item.metadata?.size || 0),
+      created_at: item.created_at || null,
+      updated_at: item.updated_at || null,
+      url,
+    });
+  }
+  return out;
+}
+
+export async function getManagedSiteAssets(): Promise<ManagedSiteAsset[]> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const assets = await listStorageFolder('');
+  return assets.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+}
+
+export async function deleteManagedSiteAsset(path: string) {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { error } = await supabase.storage.from('site-assets').remove([path]);
+  if (error) throw error;
+}
+
+export async function uploadManagedAsset(file: File, folder = 'library') {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  if (!file.type.startsWith('image/')) throw new Error('اختر ملف صورة فقط.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('حجم الصورة يجب ألا يتجاوز 8MB.');
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+  const base = file.name.replace(/[^a-z0-9_-]/gi, '-').replace(/-+/g, '-').slice(0, 60) || 'asset';
+  const path = `${folder}/${base}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('site-assets').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl;
+}
+
 export async function uploadSiteAsset(file: File, slot: string) {
   if (!supabase) throw new Error('Supabase غير مربوط.');
   if (!file.type.startsWith('image/')) throw new Error('اختر ملف صورة فقط.');

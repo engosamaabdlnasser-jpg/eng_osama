@@ -1,9 +1,10 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, UsersRound, X, UserRound, Mail, Phone, CalendarDays, ShieldCheck, BookOpenCheck } from 'lucide-react';
+import { LayoutDashboard, Settings, UsersRound, X, UserRound, Mail, Phone, CalendarDays, ShieldCheck, BookOpenCheck, Images, Trash2, Upload, RefreshCw, HardDrive } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAdminStudentDetails, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo, uploadSiteInstructorImage, uploadSiteAsset } from '../services/data';
+import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAdminStudentDetails, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo, uploadSiteInstructorImage, uploadSiteAsset, getManagedSiteAssets, deleteManagedSiteAsset, uploadManagedAsset } from '../services/data';
 import type { AdminStudentDetails, Category, Course, HomeExtraSection, Profile, SiteSettings, StudentMonitorRow } from '../types';
+import type { ManagedSiteAsset } from '../services/data';
 
 const emptyExtra: HomeExtraSection = { enabled: false, title: '', description: '', button_label: '', button_url: '' };
 
@@ -17,7 +18,7 @@ export default function Admin() {
   const [newCat, setNewCat] = useState('');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState<'overview'|'content'|'visual'|'students'>('overview');
+  const [tab, setTab] = useState<'overview'|'content'|'visual'|'assets'|'students'>('overview');
   const [visualTarget, setVisualTarget] = useState('header');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingInstructor, setUploadingInstructor] = useState(false);
@@ -25,6 +26,9 @@ export default function Admin() {
   const [savedAt, setSavedAt] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<AdminStudentDetails | null>(null);
   const [studentDetailsLoading, setStudentDetailsLoading] = useState(false);
+  const [assets, setAssets] = useState<ManagedSiteAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
+  const [assetUploading, setAssetUploading] = useState(false);
   const nav = useNavigate();
 
   async function load() {
@@ -80,6 +84,36 @@ export default function Admin() {
     } finally { setStudentDetailsLoading(false); }
   }
 
+  async function loadAssets() {
+    setAssetsLoading(true); setError('');
+    try { setAssets(await getManagedSiteAssets()); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر تحميل الملفات. تأكد من صلاحيات Storage للـAdmin.'); }
+    finally { setAssetsLoading(false); }
+  }
+
+  async function handleManagedAssetUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setAssetUploading(true); setError(''); setMsg('');
+    try { await uploadManagedAsset(file, 'library'); setMsg('تم رفع الملف بنجاح.'); await loadAssets(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الملف.'); }
+    finally { setAssetUploading(false); e.target.value = ''; }
+  }
+
+  async function handleAssetDelete(asset: ManagedSiteAsset) {
+    const currentUrls = [settings.logo_url, settings.instructor_image_url, settings.auth_background_image, settings.auth_visual_image, settings.auth_logo_light, settings.auth_logo_dark];
+    if (currentUrls.includes(asset.url)) { setError('هذا الملف مستخدم حاليًا في تصميم المنصة. غيّره من الإعدادات أولًا ثم احذفه.'); return; }
+    if (!confirm(`حذف الملف «${asset.name}» نهائيًا؟`)) return;
+    setError(''); setMsg('');
+    try { await deleteManagedSiteAsset(asset.path); setAssets(xs => xs.filter(x => x.path !== asset.path)); setMsg('تم حذف الملف وتحرير مساحته.'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر حذف الملف.'); }
+  }
+
+  function formatBytes(bytes:number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024*1024) return `${(bytes/1024).toFixed(1)} KB`;
+    return `${(bytes/(1024*1024)).toFixed(2)} MB`;
+  }
+
   function resetDesign(){ if(!confirm('إرجاع إعدادات الألوان والخط والشكل للقيم الافتراضية؟'))return; setSettings(s=>({...s,font_family:defaultSiteSettings.font_family,light_bg:defaultSiteSettings.light_bg,light_surface:defaultSiteSettings.light_surface,light_text:defaultSiteSettings.light_text,light_muted:defaultSiteSettings.light_muted,light_border:defaultSiteSettings.light_border,light_accent:defaultSiteSettings.light_accent,light_accent_soft:defaultSiteSettings.light_accent_soft,dark_bg:defaultSiteSettings.dark_bg,dark_surface:defaultSiteSettings.dark_surface,dark_text:defaultSiteSettings.dark_text,dark_muted:defaultSiteSettings.dark_muted,dark_border:defaultSiteSettings.dark_border,dark_accent:defaultSiteSettings.dark_accent,dark_accent_soft:defaultSiteSettings.dark_accent_soft,ui_radius:defaultSiteSettings.ui_radius,ui_shadow:defaultSiteSettings.ui_shadow,ui_controls:defaultSiteSettings.ui_controls,custom_css:''})); setMsg('تم تجهيز القيم الافتراضية. اضغط حفظ لتطبيقها.'); }
 
 
@@ -95,6 +129,7 @@ export default function Admin() {
       <button type="button" role="tab" aria-selected={tab==='overview'} className={tab==='overview'?'active':''} onClick={()=>setTab('overview')}><LayoutDashboard size={17}/> نظرة عامة</button>
       <button type="button" role="tab" aria-selected={tab==='content'} className={tab==='content'?'active':''} onClick={()=>setTab('content')}><Settings size={17}/> إعدادات الموقع</button>
       <button type="button" role="tab" aria-selected={tab==='visual'} className={tab==='visual'?'active':''} onClick={()=>setTab('visual')}><Settings size={17}/> المحرر البصري</button>
+      <button type="button" role="tab" aria-selected={tab==='assets'} className={tab==='assets'?'active':''} onClick={()=>{setTab('assets');loadAssets();}}><Images size={17}/> مدير الملفات</button>
       <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}><UsersRound size={17}/> مراقبة الطلاب</button>
     </div>
     {error&&<div className="error" style={{marginBottom:12}}>{error}</div>}{msg&&<div className="notice" style={{marginBottom:12}}>{msg}</div>}
@@ -171,6 +206,26 @@ export default function Admin() {
       <div className="settings-block"><div className="section-head" style={{marginBottom:12}}><div><h2 style={{margin:0}}>إضافاتك للصفحة الرئيسية</h2><p className="muted" style={{margin:'4px 0 0'}}>أنشئ أقسامًا إضافية بدون كود.</p></div><button type="button" className="btn btn-ghost" onClick={addExtra}>+ إضافة قسم</button></div>{settings.extra_sections.length===0&&<div className="empty compact">لا توجد أقسام إضافية. اضغط «إضافة قسم» لإنشاء قسم جديد.</div>}{settings.extra_sections.map((x,i)=><div className="extra-editor" key={i}><div className="rtl-row" style={{justifyContent:'space-between'}}><label className="check"><input type="checkbox" checked={x.enabled} onChange={e=>updateExtra(i,{enabled:e.target.checked})}/> عرض هذا القسم</label><button type="button" className="btn btn-danger" onClick={()=>removeExtra(i)}>حذف القسم</button></div><div className="two-col"><div><label className="label">عنوان القسم</label><input className="input" value={x.title} onChange={e=>updateExtra(i,{title:e.target.value})}/></div><div><label className="label">نص الزر</label><input className="input" value={x.button_label} onChange={e=>updateExtra(i,{button_label:e.target.value})}/></div></div><div><label className="label">الوصف</label><textarea className="input" rows={3} value={x.description} onChange={e=>updateExtra(i,{description:e.target.value})}/></div><div><label className="label">رابط الزر</label><input className="input" value={x.button_url} onChange={e=>updateExtra(i,{button_url:e.target.value})} placeholder="مثال: /courses أو https://..."/></div></div>)}</div>
       <div className="settings-actions"><button className="btn btn-primary save-settings-btn" disabled={uploadingLogo || uploadingInstructor || savingSettings}>{savingSettings ? 'جاري الحفظ...' : 'حفظ كل إعدادات الموقع'}</button>{savedAt&&<span className="save-confirm" role="status">✓ تم الحفظ الساعة {savedAt}</span>}<span className="muted small">التغييرات تُطبّق فورًا على الواجهة الحالية، وتُحفظ في قاعدة البيانات.</span></div>
     </form>}
+
+    {tab==='assets'&&<div className="surface asset-manager" style={{padding:24}}>
+      <div className="visual-editor-head">
+        <div><span className="tag">V10 • Admin only</span><h2>مدير الملفات</h2><p className="muted">إدارة صور المنصة من مكان واحد. الملفات تُحفظ في Supabase Storage ولا تحتاج إلى رفع ملفات المشروع إلى GitHub.</p></div>
+        <div className="visual-editor-badge"><HardDrive size={17}/> Storage</div>
+      </div>
+      <div className="asset-manager-toolbar">
+        <label className="btn btn-primary"><Upload size={17}/> {assetUploading?'جاري الرفع...':'رفع صورة'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleManagedAssetUpload} disabled={assetUploading} hidden /></label>
+        <button type="button" className="btn btn-ghost" onClick={loadAssets} disabled={assetsLoading}><RefreshCw size={17}/> تحديث</button>
+        <div className="storage-summary"><HardDrive size={18}/><div><strong>{formatBytes(assets.reduce((n,a)=>n+a.size,0))}</strong><span className="muted"> إجمالي الملفات المحمّلة حاليًا</span></div><small className="muted">هذا تقدير للملفات الظاهرة في Storage وليس حد الخطة.</small></div>
+      </div>
+      {assetsLoading&&<div className="empty">جاري تحميل الملفات...</div>}
+      {!assetsLoading&&!assets.length&&<div className="empty">لا توجد صور قابلة للإدارة حاليًا.</div>}
+      {!assetsLoading&&assets.length>0&&<div className="asset-manager-grid">{assets.map(asset=>{const current=[settings.logo_url,settings.instructor_image_url,settings.auth_background_image,settings.auth_visual_image,settings.auth_logo_light,settings.auth_logo_dark].includes(asset.url);return <article className="asset-card" key={asset.path}>
+        <div className="asset-card-media"><img src={asset.url} alt={asset.name}/>{current&&<span className="asset-current">مستخدم حاليًا</span>}</div>
+        <div className="asset-card-body"><strong title={asset.name}>{asset.name}</strong><span className="muted small">{asset.folder} • {formatBytes(asset.size)}</span><span className="muted small">{asset.created_at?new Date(asset.created_at).toLocaleDateString('ar-EG'):'—'}</span></div>
+        <div className="asset-card-actions"><a className="btn btn-ghost btn-small" href={asset.url} target="_blank" rel="noreferrer">فتح</a><button type="button" className="btn btn-danger btn-small" onClick={()=>handleAssetDelete(asset)} disabled={current}><Trash2 size={15}/> حذف</button></div>
+      </article>})}</div>}
+      <div className="notice" style={{marginTop:16}}>💡 حذف الملفات القديمة غير المستخدمة يساعدك على عدم استهلاك مساحة Storage بلا داعٍ. الملفات المستخدمة حاليًا محمية من الحذف حتى تغيّرها أولًا.</div>
+    </div>}
 
     {tab==='students'&&<>
       <div className="grid admin-stats"><div className="surface stat"><span className="muted">إجمالي الطلاب</span><strong>{students.length}</strong></div><div className="surface stat"><span className="muted">طلاب بدأوا التعلم</span><strong>{activeStudents}</strong></div><div className="surface stat"><span className="muted">متوسط التقدم</span><strong>{averageCompletion}%</strong></div><div className="surface stat"><span className="muted">إجمالي المستخدمين</span><strong>{users.length}</strong></div></div>

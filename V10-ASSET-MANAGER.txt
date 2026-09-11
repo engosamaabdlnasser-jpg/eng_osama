@@ -1,0 +1,19 @@
+ENG OSAMA V10 — Asset Manager
+
+Added Admin-only Asset Manager using the existing Supabase Storage bucket: site-assets.
+No new package and no new database table/SQL migration are required.
+
+Features:
+- Browse stored image assets recursively from the existing site-assets bucket.
+- Upload new images to a library/ folder.
+- Preview image, path, size, and upload date.
+- Open an asset in a new tab.
+- Delete unused assets.
+- Protect assets currently referenced by Site Settings from deletion.
+- Show total size of currently listed storage files (informational estimate, not plan quota).
+- Existing V9 Visual Editor and V8 Auth build fix are preserved.
+
+Storage permissions rely on the existing Admin Storage policies already present in the project.
+No passwords or sensitive user data are handled by this feature.
+
+Build note: dependencies were not installed in this environment, so a full production build could not be executed here.

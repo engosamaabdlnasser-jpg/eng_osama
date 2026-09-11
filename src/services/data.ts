@@ -39,6 +39,28 @@ export const defaultSiteSettings: SiteSettings = {
   support_whatsapp: '',
   support_email: '',
   support_hours: 'متاحون لمساعدتك عند الحاجة',
+  auth_background_image: '',
+  auth_visual_image: '',
+  auth_logo_light: '/eng-osama-logo-light.png',
+  auth_logo_dark: '/eng-osama-logo-dark.png',
+  font_family: 'Cairo',
+  light_bg: '#f8fafc',
+  light_surface: '#ffffff',
+  light_text: '#0f172a',
+  light_muted: '#64748b',
+  light_border: '#e2e8f0',
+  light_accent: '#0f766e',
+  light_accent_soft: '#f0fdfa',
+  dark_bg: '#0b1120',
+  dark_surface: '#111827',
+  dark_text: '#e5e7eb',
+  dark_muted: '#94a3b8',
+  dark_border: '#253246',
+  dark_accent: '#d2a146',
+  dark_accent_soft: '#2a2113',
+  ui_radius: '20px',
+  ui_shadow: '0 18px 50px rgba(15,23,42,.12)',
+  custom_css: '',
 };
 
 export async function getCourses(): Promise<Course[]> { if (!supabase) { if (DEMO_MODE) return demoCourses; throw new Error('قاعدة البيانات غير متصلة. تأكد من إعداد متغيرات Supabase.'); } const { data,error }=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('published',true).order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
@@ -73,6 +95,18 @@ export async function saveSiteSettings(settings: SiteSettings) {
   const { data, error } = await supabase.from('site_settings').upsert({ id: 'default', settings, updated_at: new Date().toISOString() }, { onConflict: 'id' }).select().single();
   if (error) throw error;
   return data;
+}
+
+export async function uploadSiteAsset(file: File, slot: string) {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  if (!file.type.startsWith('image/')) throw new Error('اختر ملف صورة فقط.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('حجم الصورة يجب ألا يتجاوز 8MB.');
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+  const safeSlot = slot.replace(/[^a-z0-9_-]/gi, '-');
+  const path = `brand/${safeSlot}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('site-assets').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl;
 }
 
 export async function uploadSiteLogo(file: File) {

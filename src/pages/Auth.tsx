@@ -21,11 +21,17 @@ export function Login() { return <AuthForm mode="login" />; }
 export function Signup() { return <AuthForm mode="signup" />; }
 
 function PublicPlatformPanel({ settings }: { settings: SiteSettings }) {
+  const lightLogo = settings.auth_logo_light || '/eng-osama-logo-light.png';
+  const darkLogo = settings.auth_logo_dark || '/eng-osama-logo-dark.png';
   return <aside className="auth-side">
     <div className="auth-side-glow" aria-hidden="true" />
+    <div className="auth-visual-layer" aria-hidden="true" />
     <div className="auth-brand-visual" aria-label={settings.brand_name || 'ENG OSAMA'}>
-      <img className="auth-brand-logo auth-brand-logo-light" src="/eng-osama-logo-light.png" alt={settings.brand_name || 'ENG OSAMA'} />
-      <img className="auth-brand-logo auth-brand-logo-dark" src="/eng-osama-logo-dark.png" alt="" aria-hidden="true" />
+      {settings.auth_visual_image ? <img className="auth-scene-image" src={settings.auth_visual_image} alt="" aria-hidden="true" /> : null}
+      <div className="auth-brand-lockup">
+        <img className="auth-brand-logo auth-brand-logo-light" src={lightLogo} alt={settings.brand_name || 'ENG OSAMA'} />
+        <img className="auth-brand-logo auth-brand-logo-dark" src={darkLogo} alt="" aria-hidden="true" />
+      </div>
     </div>
     <div className="auth-person-card">
       <div className="auth-person-avatar">
@@ -40,7 +46,7 @@ function PublicPlatformPanel({ settings }: { settings: SiteSettings }) {
     <div className="auth-side-copy">
       <span className="tag">{settings.hero_badge || 'منصة تطوير وتعليم'}</span>
       <h2>{settings.public_welcome_title || 'أهلاً بيك في منصتك التعليمية'}</h2>
-      <p>{settings.public_welcome_description || 'منصة تساعدك على التعلم والتطبيق وبناء نسخة أقوى من نفسك بخطوات واضحة.'}</p>
+      <p>{settings.public_welcome_description || 'سجّل دخولك للمتابعة داخل المنصة.'}</p>
     </div>
   </aside>;
 }

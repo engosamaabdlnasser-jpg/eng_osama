@@ -1,0 +1,8 @@
+ENG OSAMA V5 — DESIGN CONTROL CENTER
+
+- Admin can control light/dark colors, font, radius, shadows.
+- Admin can upload login background, login visual/scene, light logo and dark logo.
+- Admin can edit advanced CSS from the dashboard for fine-grained visual ownership.
+- Design settings are stored in the existing site_settings JSONB; no new SQL migration is required.
+- Saving now shows a busy state, success confirmation/time, and applies the design immediately in the open page.
+- Existing authentication, Supabase, routes and content permissions are preserved.

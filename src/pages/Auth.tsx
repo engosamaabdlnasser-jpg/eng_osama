@@ -98,7 +98,11 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           options: { data: { full_name: name.trim() || null }, emailRedirectTo: `${window.location.origin}/login?confirmed=1` },
         });
         if (error) throw error;
-        if (data.session) { const currentProfile = await getProfile(data.user.id); nav(currentProfile?.profile_setup_completed ? '/account' : '/profile/setup'); }
+        if (data.session) {
+          if (!data.user) throw new Error('تعذر إنشاء الحساب. حاول مرة أخرى.');
+          const currentProfile = await getProfile(data.user.id);
+          nav(currentProfile?.profile_setup_completed ? '/account' : '/profile/setup');
+        }
         else { sessionStorage.setItem('eng_osama_pending_email', cleanEmail); nav(`/verify-email?email=${encodeURIComponent(cleanEmail)}`); }
       }
     } catch (e) { setError(friendlyAuthError(e)); }

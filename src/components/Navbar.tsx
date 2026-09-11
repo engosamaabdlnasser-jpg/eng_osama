@@ -47,9 +47,9 @@ export default function Navbar(){
       <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'} aria-label={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
       {profile ? <Link className="btn btn-ghost account-link" to="/account"><UserCircle2 size={17}/> حسابي</Link> : <Link className="btn btn-primary" to="/login"><LogIn size={17}/> تسجيل الدخول</Link>}
     </nav>
-    <button className="btn btn-ghost mobile-menu-btn" onClick={()=>setOpen(!open)} aria-label="فتح القائمة">{open?<X/>:<Menu/>}</button>
+    <button className="btn btn-ghost mobile-menu-btn" onClick={()=>setOpen(!open)} aria-label={open ? "إغلاق القائمة" : "فتح القائمة"} aria-expanded={open} aria-controls="mobile-navigation">{open?<X/>:<Menu/>}</button>
   </div>
-  {open&&<div className="container mobile-menu">
+  {open&&<div id="mobile-navigation" className="container mobile-menu">
     <Link to="/courses" onClick={close}><BookOpen size={17}/> الكورسات</Link>
     <Link to="/categories" onClick={close}>التصنيفات</Link>
     {profile?.role === 'admin' && <Link to="/admin" onClick={close}>الإدارة</Link>}

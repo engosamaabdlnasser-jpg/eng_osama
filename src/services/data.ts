@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Category, Course, Lesson, Profile, SiteSettings, StudentMonitorRow } from '../types';
+import { DEMO_MODE } from '../utils/app';
 
 export const demoCategories: Category[] = [
   { id: '1', name: 'برمجة' }, { id: '2', name: 'ذكاء اصطناعي' },
@@ -30,11 +31,11 @@ export const defaultSiteSettings: SiteSettings = {
   extra_sections: [],
 };
 
-export async function getCourses(): Promise<Course[]> { if (!supabase) return demoCourses; const { data,error }=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('published',true).order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
-export async function getAllCourses(): Promise<Course[]> { if (!supabase) return demoCourses; const {data,error}=await supabase.from('courses').select('*,category:categories(*),lessons(*)').order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
-export async function getCourse(id:string):Promise<Course|null>{ if(!supabase)return demoCourses.find(c=>c.id===id)??null; const {data,error}=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('id',id).maybeSingle();if(error)throw error;return data as Course|null; }
-export async function getCategories():Promise<Category[]>{ if(!supabase)return demoCategories;const {data,error}=await supabase.from('categories').select('*').order('name');if(error)throw error;return data??[]; }
-export async function getProfile(id:string):Promise<Profile|null>{ if(!supabase)return null;const {data,error}=await supabase.from('profiles').select('*').eq('id',id).maybeSingle();if(error)throw error;return data as Profile|null; }
+export async function getCourses(): Promise<Course[]> { if (!supabase) { if (DEMO_MODE) return demoCourses; throw new Error('قاعدة البيانات غير متصلة. تأكد من إعداد متغيرات Supabase.'); } const { data,error }=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('published',true).order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
+export async function getAllCourses(): Promise<Course[]> { if (!supabase) { if (DEMO_MODE) return demoCourses; throw new Error('قاعدة البيانات غير متصلة. تأكد من إعداد متغيرات Supabase.'); } const {data,error}=await supabase.from('courses').select('*,category:categories(*),lessons(*)').order('created_at',{ascending:false}); if(error)throw error; return(data??[]) as Course[]; }
+export async function getCourse(id:string):Promise<Course|null>{ if(!supabase){if(DEMO_MODE)return demoCourses.find(c=>c.id===id)??null;throw new Error('قاعدة البيانات غير متصلة.');} const {data,error}=await supabase.from('courses').select('*,category:categories(*),lessons(*)').eq('id',id).maybeSingle();if(error)throw error;return data as Course|null; }
+export async function getCategories():Promise<Category[]>{ if(!supabase){if(DEMO_MODE)return demoCategories;throw new Error('قاعدة البيانات غير متصلة.');}const {data,error}=await supabase.from('categories').select('*').order('name');if(error)throw error;return data??[]; }
+export async function getProfile(id:string):Promise<Profile|null>{ if(!supabase){if(DEMO_MODE)return null;throw new Error('قاعدة البيانات غير متصلة.');}const {data,error}=await supabase.from('profiles').select('*').eq('id',id).maybeSingle();if(error)throw error;return data as Profile|null; }
 export async function updateProfile(id:string,fullName:string){if(!supabase)throw new Error('Supabase غير مربوط.');const {data,error}=await supabase.from('profiles').update({full_name:fullName.trim()||null}).eq('id',id).select().single();if(error)throw error;return data as Profile;}
 export async function getUserProgress(userId:string){if(!supabase)return {completedIds:new Set<string>(),completedAt:{} as Record<string,string>,lastCompletedAt:null as string|null};const {data,error}=await supabase.from('progress').select('lesson_id,completed_at').eq('user_id',userId).order('completed_at',{ascending:false});if(error)throw error;const completedIds=new Set<string>();const completedAt:Record<string,string>={};for(const row of data??[]){completedIds.add(row.lesson_id);if(row.completed_at)completedAt[row.lesson_id]=row.completed_at;}return {completedIds,completedAt,lastCompletedAt:data?.[0]?.completed_at??null};}
 export async function getAdminProfiles():Promise<Profile[]>{ if(!supabase)return [];const {data,error}=await supabase.from('profiles').select('*').order('created_at',{ascending:false});if(error)throw error;return(data??[]) as Profile[]; }
@@ -46,7 +47,7 @@ export async function markLessonComplete(userId:string,lessonId:string){if(!supa
 export async function getCompleted(userId:string){if(!supabase)return new Set<string>();const {data,error}=await supabase.from('progress').select('lesson_id').eq('user_id',userId);if(error)throw error;return new Set((data??[]).map(x=>x.lesson_id));}
 
 export async function getSiteSettings(): Promise<SiteSettings> {
-  if (!supabase) return defaultSiteSettings;
+  if (!supabase) { if (DEMO_MODE) return defaultSiteSettings; throw new Error('قاعدة البيانات غير متصلة.'); }
   const { data, error } = await supabase.from('site_settings').select('settings').eq('id', 'default').maybeSingle();
   if (error) throw error;
   const raw = data?.settings ?? {};
@@ -72,6 +73,35 @@ export async function uploadSiteLogo(file: File) {
   if (error) throw error;
   const { data } = supabase.storage.from('site-assets').getPublicUrl(path);
   return data.publicUrl;
+}
+
+export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null) {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl }).eq('id', id).select().single();
+  if (error) throw error;
+  return data as Profile;
+}
+
+export async function uploadProfileAvatar(userId: string, file: File) {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  if (!file.type.startsWith('image/')) throw new Error('اختار صورة فقط.');
+  if (file.size > 2 * 1024 * 1024) throw new Error('حجم الصورة يجب ألا يتجاوز 2MB.');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `avatars/${userId}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('site-assets').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl;
+}
+
+export async function uploadCourseImage(file: File) {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  if (!file.type.startsWith('image/')) throw new Error('اختار صورة فقط.');
+  if (file.size > 3 * 1024 * 1024) throw new Error('حجم صورة الكورس يجب ألا يتجاوز 3MB.');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `courses/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from('site-assets').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl;
 }
 
 export async function getStudentMonitorData(): Promise<StudentMonitorRow[]> {

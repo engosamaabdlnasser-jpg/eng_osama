@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { getCategories, getCourse, getProfile } from '../services/data';
+import { getCategories, getCourse, getProfile, uploadCourseImage } from '../services/data';
 import { extractYouTubeVideoId } from '../utils/youtube';
 import type { Category, Course, Lesson } from '../types';
 
@@ -9,7 +9,7 @@ export default function AdminCourse() {
   const { id } = useParams(); const edit = Boolean(id); const nav = useNavigate();
   const [cats, setCats] = useState<Category[]>([]); const [course, setCourse] = useState<Course | null>(null);
   const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [instructor, setInstructor] = useState('ENG OSAMA'); const [category, setCategory] = useState(''); const [image, setImage] = useState(''); const [published, setPublished] = useState(false); const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [ltitle, setLtitle] = useState(''); const [lurl, setLurl] = useState(''); const [ldesc, setLdesc] = useState(''); const [error, setError] = useState(''); const [msg, setMsg] = useState(''); const [busy, setBusy] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false); const [ltitle, setLtitle] = useState(''); const [lurl, setLurl] = useState(''); const [ldesc, setLdesc] = useState(''); const [error, setError] = useState(''); const [msg, setMsg] = useState(''); const [busy, setBusy] = useState(false);
 
   useEffect(() => { (async () => {
     if (!supabase) { setError('Supabase غير مربوط. هذه الصفحة تحتاج قاعدة بيانات حقيقية.'); return; }
@@ -18,6 +18,13 @@ export default function AdminCourse() {
     setCats(await getCategories());
     if (edit && id) { const c = await getCourse(id); if (!c) { setError('الكورس غير موجود.'); return; } setCourse(c); setTitle(c.title); setDescription(c.description); setInstructor(c.instructor_name); setCategory(c.category_id ?? ''); setImage(c.image_url ?? ''); setPublished(c.published); setLessons([...(c.lessons ?? [])].sort((a,b) => a.sort_order - b.sort_order)); }
   })().catch(e => setError(e instanceof Error ? e.message : 'حدث خطأ')); }, [edit, id, nav]);
+
+  async function uploadImage(file?: File) {
+    if (!file) return; setError(''); setMsg(''); setImageBusy(true);
+    try { setImage(await uploadCourseImage(file)); setMsg('تم رفع صورة الكورس. احفظ الكورس لتثبيتها.'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الصورة.'); }
+    finally { setImageBusy(false); }
+  }
 
   async function save(e: React.FormEvent) { e.preventDefault(); setError(''); setMsg(''); if (!supabase) return; setBusy(true); try {
     const payload = { title: title.trim(), description: description.trim(), image_url: image.trim() || null, category_id: category || null, instructor_name: instructor.trim() || 'ENG OSAMA', published };
@@ -38,7 +45,7 @@ export default function AdminCourse() {
       <div><label className="label">العنوان</label><input className="input" required value={title} onChange={e=>setTitle(e.target.value)}/></div>
       <div><label className="label">الوصف</label><textarea className="input" required rows={5} value={description} onChange={e=>setDescription(e.target.value)}/></div>
       <div className="two-col"><div><label className="label">التصنيف</label><select className="input" value={category} onChange={e=>setCategory(e.target.value)}><option value="">بدون تصنيف</option>{cats.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div><div><label className="label">المدرب</label><input className="input" value={instructor} onChange={e=>setInstructor(e.target.value)}/></div></div>
-      <div><label className="label">رابط الصورة (اختياري)</label><input className="input" type="url" value={image} onChange={e=>setImage(e.target.value)} placeholder="https://..."/></div>
+      <div><label className="label">صورة الكورس</label><div className="rtl-row"><input className="input" type="url" value={image} onChange={e=>setImage(e.target.value)} placeholder="رابط صورة اختياري"/><label className="btn btn-ghost file-btn">{imageBusy ? "جاري الرفع..." : "رفع صورة"}<input className="sr-only" type="file" accept="image/*" disabled={imageBusy} onChange={e=>uploadImage(e.target.files?.[0])}/></label></div><small className="muted">JPG / PNG / WebP — حتى 3MB</small>{image&&<img className="admin-image-preview" src={image} alt="معاينة صورة الكورس" loading="lazy"/>}</div>
       <label className="check"><input type="checkbox" checked={published} onChange={e=>setPublished(e.target.checked)}/><span>نشر الكورس للطلاب</span></label>
       {error && <div className="error">{error}</div>}{msg && <div className="notice">{msg}</div>}<button className="btn btn-primary" disabled={busy}>{busy ? 'جاري الحفظ...' : 'حفظ الكورس'}</button>
     </form>

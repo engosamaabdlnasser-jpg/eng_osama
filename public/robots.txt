@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://eng-osama.vercel.app/sitemap.xml

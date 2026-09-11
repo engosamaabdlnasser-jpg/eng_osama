@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, LockKeyhole, LogOut, Moon, Save, Sun } from 'lucide-react';
+import { CheckCircle2, Clock3, ImagePlus, LockKeyhole, LogOut, Moon, Save, Sun } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { getCourses, getProfile, getUserProgress, updateProfile } from '../services/data';
+import { getCourses, getProfile, getUserProgress, updateProfileDetails, uploadProfileAvatar } from '../services/data';
 import type { Course, Profile, UserProgress } from '../types';
 import { useTheme } from '../components/ThemeProvider';
 
@@ -10,6 +10,8 @@ export default function Account() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [progress, setProgress] = useState<UserProgress>({ completedIds: new Set(), completedAt: {}, lastCompletedAt: null });
   const [saving, setSaving] = useState(false);
@@ -25,8 +27,8 @@ export default function Account() {
     let active = true;
     async function load() {
       if (!supabase) {
-        setProfile({ id: 'demo', full_name: 'زائر', role: 'student' });
-        setName('زائر');
+        setProfile({ id: 'demo', full_name: 'زائر', avatar_url: null, role: 'student' });
+        setName('زائر'); setAvatarUrl(null);
         return;
       }
       const { data } = await supabase.auth.getUser();
@@ -35,7 +37,7 @@ export default function Account() {
       const [p, c, pr] = await Promise.all([getProfile(data.user.id), getCourses(), getUserProgress(data.user.id)]);
       if (!active) return;
       setProfile(p);
-      setName(p?.full_name || '');
+      setName(p?.full_name || ''); setAvatarUrl(p?.avatar_url || null);
       setCourses(c);
       setProgress(pr);
     }
@@ -62,11 +64,19 @@ export default function Account() {
     if (!supabase || !profile || profile.id === 'demo') return;
     setSaving(true);
     try {
-      const updated = await updateProfile(profile.id, name);
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl);
       setProfile(updated);
       setMsg('تم حفظ بيانات الملف الشخصي.');
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حفظ الاسم.'); }
     finally { setSaving(false); }
+  }
+
+  async function uploadAvatar(file?: File) {
+    if (!file || !profile || profile.id === 'demo') return;
+    setError(''); setMsg(''); setAvatarBusy(true);
+    try { const url = await uploadProfileAvatar(profile.id, file); const updated = await updateProfileDetails(profile.id, name, url); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الصورة.'); }
+    finally { setAvatarBusy(false); }
   }
 
   async function changePassword(e: React.FormEvent) {
@@ -88,7 +98,7 @@ export default function Account() {
 
   return <section className="section"><div className="container profile-page">
     <div className="profile-hero surface">
-      <div className="profile-avatar">{(profile?.full_name || 'ط').trim().charAt(0).toUpperCase() || 'ط'}</div>
+      <label className="profile-avatar profile-avatar-edit" title="تغيير صورة الملف الشخصي">{avatarUrl ? <img src={avatarUrl} alt="صورة الملف الشخصي"/> : <span>{(profile?.full_name || 'ط').trim().charAt(0).toUpperCase() || 'ط'}</span>}<input className="sr-only" type="file" accept="image/*" disabled={avatarBusy} onChange={e=>uploadAvatar(e.target.files?.[0])}/><span className="avatar-edit-badge"><ImagePlus size={15}/></span></label>
       <div className="profile-hero-text"><span className="tag">الملف الشخصي</span><h1 className="section-title">أهلًا {profile?.full_name || 'بك'}</h1><p className="muted">{email || 'حساب طالب'} · {profile?.role === 'admin' ? 'مدير' : 'طالب'}</p></div>
       <div className="profile-actions"><button className="btn btn-ghost" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={17}/> : <Moon size={17}/>} {theme === 'dark' ? 'مظهر فاتح' : 'مظهر داكن'}</button><button className="btn btn-danger" onClick={logout}><LogOut size={17}/> تسجيل الخروج</button></div>
     </div>
@@ -99,7 +109,7 @@ export default function Account() {
     <div className="grid profile-stats" style={{ marginTop: 18 }}>
       <div className="surface stat"><span className="muted">الكورسات التي بدأت</span><strong>{startedCourses.length}</strong></div>
       <div className="surface stat"><span className="muted">الدروس المكتملة</span><strong>{completedCount}</strong></div>
-      <div className="surface stat"><span className="muted">متوسط التقدم</span><strong>{overallPercent}%</strong></div>
+      <div className="surface stat"><span className="muted">نسبة إكمال المحتوى</span><strong>{overallPercent}%</strong></div>
       <div className="surface stat"><span className="muted">آخر نشاط</span><strong style={{ fontSize: 16 }}>{progress.lastCompletedAt ? new Date(progress.lastCompletedAt).toLocaleDateString('ar-EG') : 'لا يوجد بعد'}</strong></div>
     </div>
 
@@ -121,7 +131,7 @@ export default function Account() {
       </form>
     </div>
 
-    <div style={{ marginTop: 28 }}><div className="section-head"><div><span className="tag">تعلمي</span><h2 className="section-title">الكورسات الحالية</h2></div><Link className="btn btn-ghost" to="/courses">استكشف المزيد</Link></div>
+    <div style={{ marginTop: 28 }}><div className="section-head"><div><span className="tag">مساري التعليمي</span><h2 className="section-title">الكورسات الحالية</h2></div><Link className="btn btn-ghost" to="/courses">استكشف المزيد</Link></div>
       {startedCourses.length ? <div className="grid">{startedCourses.map(course => { const total=course.lessons?.length||0; const done=course.lessons?.filter(l=>progress.completedIds.has(l.id)).length||0; const pct=total?Math.round(done/total*100):0; const next=course.lessons?.find(l=>!progress.completedIds.has(l.id)); return <div className="surface course-progress-card" key={course.id}><div><span className="muted small">{course.category?.name || 'كورس'}</span><h3>{course.title}</h3><div className="progress-cell wide"><div className="progress-bar"><span style={{width:`${pct}%`}}/></div><strong>{pct}%</strong></div><p className="muted small">{done} من {total} درس مكتمل</p></div>{next ? <Link className="btn btn-primary" to={`/courses/${course.id}/lessons/${next.id}`}>متابعة</Link> : <span className="completed-badge"><CheckCircle2 size={16}/> مكتمل</span>}</div>})}</div> : <div className="surface empty"><Clock3 size={30} /><p>لم تبدأ أي كورس بعد. ابدأ أول رحلة تعليمية الآن.</p><Link className="btn btn-primary" to="/courses">استكشف الكورسات</Link></div>}
     </div>
   </div></section>;

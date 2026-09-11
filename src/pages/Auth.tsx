@@ -142,6 +142,7 @@ export function ProfileSetup() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
+  const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -164,6 +165,7 @@ export function ProfileSetup() {
         setName(currentProfile?.full_name || '');
         setPhone(currentProfile?.phone || '');
         setAge(currentProfile?.age != null ? String(currentProfile.age) : '');
+        setBio(currentProfile?.bio || '');
         if (currentProfile?.profile_setup_completed) { nav('/account'); return; }
         setAvatarUrl(currentProfile?.avatar_url || null);
         setAvatarPreviewUrl(currentProfile?.avatar_url || null);
@@ -200,7 +202,7 @@ export function ProfileSetup() {
         setSaving(false);
         return;
       }
-      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true);
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true, bio);
       setProfile(updated);
       setMsg('تم حفظ معلوماتك بنجاح.');
       window.setTimeout(() => nav('/account'), 450);
@@ -217,7 +219,7 @@ export function ProfileSetup() {
         setError('العمر يجب أن يكون رقمًا صحيحًا بين 5 و100 سنة.');
         return;
       }
-      await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true);
+      await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true, bio);
       nav('/account');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر تجاوز هذه الخطوة. حاول مرة أخرى.');
@@ -247,6 +249,7 @@ export function ProfileSetup() {
               <div><label className="label" htmlFor="profile-phone">رقم الهاتف</label><input id="profile-phone" className="input" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="01xxxxxxxxx" /></div>
               <div><label className="label" htmlFor="profile-age">العمر</label><input id="profile-age" className="input" type="number" inputMode="numeric" min="5" max="100" value={age} onChange={e => setAge(e.target.value)} placeholder="مثال: 20" /></div>
             </div>
+            <div><label className="label" htmlFor="profile-bio">نبذة عنك</label><textarea id="profile-bio" className="input" rows={3} value={bio} onChange={e => setBio(e.target.value)} placeholder="اكتب نبذة قصيرة عنك (اختياري)" /></div>
             <div><label className="label" htmlFor="profile-email">البريد الإلكتروني</label><input id="profile-email" className="input" value={email} readOnly aria-describedby="profile-email-note" /><span id="profile-email-note" className="small muted">البريد مرتبط بحسابك ولا يتم تغييره من هذه الخطوة.</span></div>
           </div>
         </div>

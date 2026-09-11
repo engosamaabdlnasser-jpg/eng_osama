@@ -90,7 +90,7 @@ export async function getUserProgress(userId:string){if(!supabase)return {comple
 export async function getAdminProfiles():Promise<Profile[]>{ if(!supabase)return [];const {data,error}=await supabase.from('profiles').select('*').order('created_at',{ascending:false});if(error)throw error;return(data??[]) as Profile[]; }
 export async function createCategory(name:string){if(!supabase)throw new Error('Supabase غير مربوط.');const {data,error}=await supabase.from('categories').insert({name:name.trim()}).select().single();if(error)throw error;return data as Category;}
 export async function renameCategory(id:string,name:string){if(!supabase)throw new Error('Supabase غير مربوط.');const {data,error}=await supabase.from('categories').update({name:name.trim()}).eq('id',id).select().single();if(error)throw error;return data as Category;}
-export async function setUserRole(id:string,role:'student'|'admin'){if(!supabase)throw new Error('Supabase غير مربوط.');const {data,error}=await supabase.from('profiles').update({role}).eq('id',id).select().single();if(error)throw error;return data as Profile;}
+export async function setUserRole(id:string,role:'student'|'admin'){if(!supabase)throw new Error('Supabase غير مربوط.');const {data,error}=await supabase.rpc('admin_set_user_role',{target_user_id:id,new_role:role});if(error)throw error;const row=Array.isArray(data)?data[0]:data;if(!row)throw new Error('تعذر تحديث الصلاحية.');return row as Profile;}
 export async function deleteCategory(id:string){if(!supabase)throw new Error('Supabase غير مربوط.');const {error}=await supabase.from('categories').delete().eq('id',id);if(error)throw error;}
 export async function markLessonComplete(userId:string,lessonId:string){if(!supabase)return;const {error}=await supabase.from('progress').upsert({user_id:userId,lesson_id:lessonId},{onConflict:'user_id,lesson_id'});if(error)throw error;}
 export async function getCompleted(userId:string){if(!supabase)return new Set<string>();const {data,error}=await supabase.from('progress').select('lesson_id').eq('user_id',userId);if(error)throw error;return new Set((data??[]).map(x=>x.lesson_id));}
@@ -137,11 +137,12 @@ export async function uploadSiteLogo(file: File) {
   return data.publicUrl;
 }
 
-export export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null, phone: string | null = null, age: number | null = null, profileSetupCompleted = true) {
+export async function updateProfileDetails(id: string, fullName: string, avatarUrl: string | null, phone: string | null = null, age: number | null = null, profileSetupCompleted = true, bio: string | null = null) {
   if (!supabase) throw new Error('Supabase غير مربوط.');
   const normalizedPhone = phone?.trim() || null;
   const normalizedAge = age === null || age === undefined || Number.isNaN(age) ? null : age;
-  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl, phone: normalizedPhone, age: normalizedAge, profile_setup_completed: profileSetupCompleted }).eq('id', id).select().single();
+  const normalizedBio = bio?.trim() || null;
+  const { data, error } = await supabase.from('profiles').update({ full_name: fullName.trim() || null, avatar_url: avatarUrl, phone: normalizedPhone, age: normalizedAge, bio: normalizedBio, profile_setup_completed: profileSetupCompleted }).eq('id', id).select().single();
   if (error) throw error;
   return data as Profile;
 }

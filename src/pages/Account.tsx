@@ -12,6 +12,7 @@ export default function Account() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
+  const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -30,7 +31,7 @@ export default function Account() {
     let active = true;
     async function load() {
       if (!supabase) {
-        setProfile({ id: 'demo', full_name: 'زائر', phone: null, age: null, avatar_url: null, profile_setup_completed: true, role: 'student' });
+        setProfile({ id: 'demo', full_name: 'زائر', phone: null, age: null, avatar_url: null, bio: null, profile_setup_completed: true, role: 'student' });
         setName('زائر'); setAvatarUrl(null);
         return;
       }
@@ -40,7 +41,7 @@ export default function Account() {
       const [p, c, pr] = await Promise.all([getProfile(data.user.id), getCourses(), getUserProgress(data.user.id)]);
       if (!active) return;
       setProfile(p);
-      setName(p?.full_name || ''); setAvatarPreviewUrl(p?.avatar_url || null); setPhone(p?.phone || ''); setAge(p?.age != null ? String(p.age) : ''); setAvatarUrl(p?.avatar_url || null);
+      setName(p?.full_name || ''); setBio(p?.bio || ''); setAvatarPreviewUrl(p?.avatar_url || null); setPhone(p?.phone || ''); setAge(p?.age != null ? String(p.age) : ''); setAvatarUrl(p?.avatar_url || null);
       setCourses(c);
       setProgress(pr);
     }
@@ -69,7 +70,7 @@ export default function Account() {
     try {
       const parsedAge = age.trim() ? Number(age) : null;
       if (parsedAge !== null && (!Number.isInteger(parsedAge) || parsedAge < 5 || parsedAge > 100)) { setError('العمر يجب أن يكون رقمًا صحيحًا بين 5 و100 سنة.'); setSaving(false); return; }
-      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true);
+      const updated = await updateProfileDetails(profile.id, name, avatarUrl, phone, parsedAge, true, bio);
       setProfile(updated);
       setMsg('تم حفظ بيانات الملف الشخصي.');
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حفظ الاسم.'); }
@@ -80,7 +81,7 @@ export default function Account() {
     if (!file || !profile || profile.id === 'demo') return;
     setError(''); setMsg(''); setAvatarBusy(true);
     setAvatarPreviewUrl(URL.createObjectURL(file));
-    try { const url = await uploadProfileAvatar(profile.id, file); setAvatarPreviewUrl(url); const updated = await updateProfileDetails(profile.id, name, url, phone, age.trim() ? Number(age) : null, true); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
+    try { const url = await uploadProfileAvatar(profile.id, file); setAvatarPreviewUrl(url); const updated = await updateProfileDetails(profile.id, name, url, phone, age.trim() ? Number(age) : null, true, bio); setProfile(updated); setAvatarUrl(url); setMsg('تم تحديث صورة الملف الشخصي.'); }
     catch (e) { setError(e instanceof Error ? e.message : 'تعذر رفع الصورة.'); }
     finally { setAvatarBusy(false); }
   }
@@ -129,7 +130,7 @@ export default function Account() {
           <div><label className="label">رقم الهاتف</label><input className="input" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="01xxxxxxxxx" /></div>
           <div><label className="label">العمر</label><input className="input" type="number" min="5" max="100" inputMode="numeric" value={age} onChange={e => setAge(e.target.value)} placeholder="مثال: 20" /></div>
         </div>
-        <div><label className="label">البريد الإلكتروني</label><input className="input" value={email} disabled /></div>
+        <div><label className="label">نبذة عني</label><textarea className="input" rows={3} value={bio} onChange={e=>setBio(e.target.value)} placeholder="نبذة قصيرة عنك (اختياري)" /></div><div><label className="label">البريد الإلكتروني</label><input className="input" value={email} disabled /></div>
         <button className="btn btn-primary" disabled={saving}><Save size={17}/> {saving ? 'جاري الحفظ...' : 'حفظ البيانات'}</button>
       </form>
 

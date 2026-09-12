@@ -356,3 +356,16 @@ export async function updateSupportConversationStatus(conversationId: string, st
   if (error) throw error;
   return data as import('../types').Conversation;
 }
+
+export async function getMyNotifications(limit = 30): Promise<import('../types').UserNotification[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('user_notifications').select('*').order('created_at', { ascending: false }).limit(Math.max(1, Math.min(limit, 100)));
+  if (error) throw error;
+  return (data ?? []) as import('../types').UserNotification[];
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { error } = await supabase.from('user_notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId);
+  if (error) throw error;
+}

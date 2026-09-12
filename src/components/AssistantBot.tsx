@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, LifeBuoy, Send, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { askAssistantAI, getProfile, recordAssistantMessage } from '../services/data';
+import { askAssistantAI, getProfile, getSiteSettings, recordAssistantMessage } from '../services/data';
 import type { Profile } from '../types';
 import { useI18n } from '../i18n';
 

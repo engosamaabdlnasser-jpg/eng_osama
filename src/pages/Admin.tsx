@@ -1,8 +1,8 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, UsersRound, X, UserRound, Mail, Phone, CalendarDays, ShieldCheck, BookOpenCheck, Images, Trash2, Upload, RefreshCw, HardDrive } from 'lucide-react';
+import { LayoutDashboard, Settings, UsersRound, MessageSquare, X, UserRound, Mail, Phone, CalendarDays, ShieldCheck, BookOpenCheck, Images, Trash2, Upload, RefreshCw, HardDrive } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAdminStudentDetails, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo, uploadSiteInstructorImage, uploadSiteAsset, getManagedSiteAssets, deleteManagedSiteAsset, uploadManagedAsset } from '../services/data';
+import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAdminStudentDetails, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo, uploadSiteInstructorImage, uploadSiteAsset, getManagedSiteAssets, deleteManagedSiteAsset, uploadManagedAsset, getAssistantInbox, getAssistantMessages, sendAdminAssistantMessage } from '../services/data';
 import type { AdminStudentDetails, Category, Course, HomeExtraSection, Profile, SiteSettings, StudentMonitorRow } from '../types';
 import type { ManagedSiteAsset } from '../services/data';
 
@@ -18,7 +18,8 @@ export default function Admin() {
   const [newCat, setNewCat] = useState('');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState<'overview'|'content'|'visual'|'assets'|'students'>('overview');
+  const [tab, setTab] = useState<'overview'|'content'|'visual'|'assets'|'students'|'assistant'>('overview');
+  const [assistantInbox,setAssistantInbox]=useState<any[]>([]); const [selectedConversation,setSelectedConversation]=useState<any|null>(null); const [assistantMessages,setAssistantMessages]=useState<any[]>([]); const [adminReply,setAdminReply]=useState('');
   const [visualTarget, setVisualTarget] = useState('header');
   const [componentTarget, setComponentTarget] = useState('home.hero');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -85,6 +86,10 @@ export default function Admin() {
     } finally { setStudentDetailsLoading(false); }
   }
 
+  async function loadAssistantInbox(){try{setAssistantInbox(await getAssistantInbox())}catch(e){setError(e instanceof Error?e.message:'تعذر تحميل محادثات المساعد.')}}
+  async function openAssistantConversation(c:any){setSelectedConversation(c);try{setAssistantMessages(await getAssistantMessages(c.id))}catch(e){setError(e instanceof Error?e.message:'تعذر تحميل المحادثة.')}}
+  async function replyAssistant(){if(!selectedConversation||!adminReply.trim())return;try{await sendAdminAssistantMessage(selectedConversation.id,adminReply.trim());setAdminReply('');setAssistantMessages(await getAssistantMessages(selectedConversation.id));setAssistantInbox(await getAssistantInbox())}catch(e){setError(e instanceof Error?e.message:'تعذر إرسال الرد.')}}
+
   async function loadAssets() {
     setAssetsLoading(true); setError('');
     try { setAssets(await getManagedSiteAssets()); }
@@ -148,7 +153,7 @@ export default function Admin() {
       <button type="button" role="tab" aria-selected={tab==='content'} className={tab==='content'?'active':''} onClick={()=>setTab('content')}><Settings size={17}/> إعدادات الموقع</button>
       <button type="button" role="tab" aria-selected={tab==='visual'} className={tab==='visual'?'active':''} onClick={()=>setTab('visual')}><Settings size={17}/> المحرر البصري</button>
       <button type="button" role="tab" aria-selected={tab==='assets'} className={tab==='assets'?'active':''} onClick={()=>{setTab('assets');loadAssets();}}><Images size={17}/> مدير الملفات</button>
-      <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}><UsersRound size={17}/> مراقبة الطلاب</button>
+      <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}><UsersRound size={17}/> مراقبة الطلاب</button><button type="button" role="tab" aria-selected={tab==='assistant'} className={tab==='assistant'?'active':''} onClick={()=>{setTab('assistant');loadAssistantInbox();}}><MessageSquare size={17}/> رسائل المساعد</button>
     </div>
     {error&&<div className="error" style={{marginBottom:12}}>{error}</div>}{msg&&<div className="notice" style={{marginBottom:12}}>{msg}</div>}
 
@@ -210,6 +215,7 @@ export default function Admin() {
 
     {tab==='content'&&<form className="surface form-grid" style={{padding:24}} onSubmit={saveSettings}>
       <div className="admin-form-note"><strong>إدارة كاملة للمظهر والمحتوى الظاهر للزائر</strong><span className="muted">غير اللوجو والنصوص والأقسام من هنا، بدون تعديل الكود.</span></div>
+      <div className="settings-block"><h2>المساعد الذكي</h2><p className="muted">تحكم في المساعد داخل المنصة. تعطيل المساعد يخفيه عن المستخدمين بدون حذف المحادثات.</p><div className="check-row"><label className="check"><input type="checkbox" checked={settings.assistant_enabled!==false} onChange={e=>setSettings({...settings,assistant_enabled:e.target.checked})}/> تفعيل المساعد داخل المنصة</label><label className="check"><input type="checkbox" checked={settings.assistant_ai_enabled!==false} onChange={e=>setSettings({...settings,assistant_ai_enabled:e.target.checked})}/> تفعيل محرك AI</label><label className="check"><input type="checkbox" checked={settings.assistant_support_enabled!==false} onChange={e=>setSettings({...settings,assistant_support_enabled:e.target.checked})}/> السماح بتحويل المحادثة للدعم</label></div></div>
       <div className="settings-block"><h2>الهوية</h2><div className="two-col"><div><label className="label">اسم المنصة</label><input className="input" value={settings.brand_name} onChange={e=>setSettings({...settings,brand_name:e.target.value})}/></div><div><label className="label">رفع اللوجو من جهازك</label><input className="input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo}/><div className="muted small" style={{marginTop:6}}>{uploadingLogo?'جاري رفع اللوجو...':'حتى 4MB — ثم اضغط حفظ'}</div></div></div><div className="logo-preview-row"><div className="logo-preview-box">{settings.logo_url?<img src={settings.logo_url} alt="معاينة اللوجو"/>:<span>لا يوجد لوجو</span>}</div><div><div className="muted small">رابط اللوجو الحالي</div><div className="small" style={{wordBreak:'break-all'}}>{settings.logo_url||'—'}</div></div></div></div>
       <div className="settings-block"><h2>الهيدر والشريط العلوي</h2><div className="two-col"><div><label className="label">نص الشريط العلوي</label><input className="input" value={settings.announcement} onChange={e=>setSettings({...settings,announcement:e.target.value})} placeholder="اتركه فارغًا لإخفائه"/></div><div className="check-row"><label className="check"><input type="checkbox" checked={settings.show_categories} onChange={e=>setSettings({...settings,show_categories:e.target.checked})}/> عرض التصنيفات في الرئيسية</label><label className="check"><input type="checkbox" checked={settings.show_featured} onChange={e=>setSettings({...settings,show_featured:e.target.checked})}/> عرض أحدث الكورسات</label></div></div></div>
       <div className="settings-block"><h2>القسم الرئيسي</h2><div><label className="label">عنوان البطل</label><input className="input" value={settings.hero_badge} onChange={e=>setSettings({...settings,hero_badge:e.target.value})}/></div><div><label className="label">العنوان الرئيسي</label><textarea className="input" rows={3} value={settings.hero_title} onChange={e=>setSettings({...settings,hero_title:e.target.value})}/></div><div><label className="label">وصف الصفحة الرئيسية</label><textarea className="input" rows={4} value={settings.hero_description} onChange={e=>setSettings({...settings,hero_description:e.target.value})}/></div><div className="two-col"><div><label className="label">زر أساسي</label><input className="input" value={settings.primary_cta_label} onChange={e=>setSettings({...settings,primary_cta_label:e.target.value})}/></div><div><label className="label">زر ثانوي</label><input className="input" value={settings.secondary_cta_label} onChange={e=>setSettings({...settings,secondary_cta_label:e.target.value})}/></div></div></div>
@@ -261,6 +267,9 @@ export default function Admin() {
       </article>})}</div>}
       <div className="notice" style={{marginTop:16}}>💡 حذف الملفات القديمة غير المستخدمة يساعدك على عدم استهلاك مساحة Storage بلا داعٍ. الملفات المستخدمة حاليًا محمية من الحذف حتى تغيّرها أولًا.</div>
     </div>}
+
+
+    {tab==='assistant'&&<div className="assistant-inbox-admin"><div className="surface assistant-inbox-list"><div className="admin-panel-head"><div><h2>رسائل المساعد</h2><p className="muted">محادثات الطلاب مع المساعد داخل المنصة.</p></div><button className="btn btn-ghost" onClick={loadAssistantInbox}><RefreshCw size={15}/> تحديث</button></div>{assistantInbox.length?assistantInbox.map(c=><button key={c.id} className={`assistant-inbox-item ${selectedConversation?.id===c.id?'active':''}`} onClick={()=>openAssistantConversation(c)}><strong>{c.title||'محادثة جديدة'}</strong><span>{new Date(c.updated_at).toLocaleString('ar-EG')}</span><small>{c.status}</small></button>):<div className="empty">لا توجد محادثات مسجلة بعد.</div>}</div><div className="surface assistant-inbox-chat">{selectedConversation?<><div className="admin-panel-head"><div><h2>{selectedConversation.title||'محادثة'}</h2><p className="muted">Conversation ID: {selectedConversation.id}</p></div></div><div className="assistant-admin-messages">{assistantMessages.map(m=><div key={m.id} className={`assistant-admin-message ${m.role}`}><strong>{m.role==='user'?'الطالب':m.role==='assistant'?'المساعد':'Admin'}</strong><p>{m.content}</p></div>)}</div><div className="assistant-admin-reply"><textarea className="input" rows={3} value={adminReply} onChange={e=>setAdminReply(e.target.value)} placeholder="اكتب ردك للطالب..."/><button className="btn btn-primary" onClick={replyAssistant}>إرسال الرد</button></div></>:<div className="empty">اختر محادثة لعرضها.</div>}</div></div>}
 
     {tab==='students'&&<>
       <div className="grid admin-stats"><div className="surface stat"><span className="muted">إجمالي الطلاب</span><strong>{students.length}</strong></div><div className="surface stat"><span className="muted">طلاب بدأوا التعلم</span><strong>{activeStudents}</strong></div><div className="surface stat"><span className="muted">متوسط التقدم</span><strong>{averageCompletion}%</strong></div><div className="surface stat"><span className="muted">إجمالي المستخدمين</span><strong>{users.length}</strong></div></div>

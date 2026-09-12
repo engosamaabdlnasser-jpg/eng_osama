@@ -68,8 +68,9 @@ export default function AssistantBot() {
   }, [supportOpen]);
 
   useEffect(() => {
-    if (!supabase || !conversation?.id) return;
-    const channel = supabase.channel(`student-support-${conversation.id}`)
+    const client = supabase;
+    if (!client || !conversation?.id) return;
+    const channel = client.channel(`student-support-${conversation.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages', filter: `conversation_id=eq.${conversation.id}` }, payload => {
         const incoming = payload.new as ConversationMessage;
         setSupportMessages(prev => prev.some(message => message.id === incoming.id) ? prev : [...prev, incoming]);
@@ -78,7 +79,7 @@ export default function AssistantBot() {
         setConversation(payload.new as Conversation);
       })
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => { void client.removeChannel(channel); };
   }, [conversation?.id]);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, supportMessages, open, supportOpen]);

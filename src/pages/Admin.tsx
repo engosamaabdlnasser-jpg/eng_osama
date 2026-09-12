@@ -88,10 +88,11 @@ export default function Admin() {
   }
 
   async function toggleRetentionExempt(conversation: Conversation) {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     setSupportActionLoading(true);
     try {
-      const { data, error } = await supabase.from('conversations').update({ retention_exempt: !conversation.retention_exempt }).eq('id', conversation.id).select('*').single();
+      const { data, error } = await client.from('conversations').update({ retention_exempt: !conversation.retention_exempt }).eq('id', conversation.id).select('*').single();
       if (error) throw error;
       const updated = data as Conversation;
       setSelectedConversation(updated);
@@ -138,15 +139,16 @@ export default function Admin() {
 
   useEffect(() => { load().catch(e => setError(e instanceof Error ? e.message : 'حدث خطأ')); }, [nav]);
   useEffect(() => {
-    if (!supabase || tab !== 'support') return;
-    const channel = supabase.channel('admin-support-inbox')
+    const client = supabase;
+    if (!client || tab !== 'support') return;
+    const channel = client.channel('admin-support-inbox')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => { void loadSupportInbox(); })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' }, () => {
         if (selectedConversation) getConversationMessages(selectedConversation.id).then(setConversationMessages).catch(() => {});
         void loadSupportInbox();
       })
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => { void client.removeChannel(channel); };
   }, [tab, selectedConversation?.id]);
 
 

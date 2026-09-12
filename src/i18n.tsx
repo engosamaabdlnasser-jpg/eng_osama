@@ -5,7 +5,7 @@ const STORAGE_KEY = 'eng-osama-locale';
 
 const translations = {
   ar: {
-    'nav.courses':'الكورسات','nav.categories':'التصنيفات','nav.admin':'الإدارة','nav.account':'حسابي','nav.login':'تسجيل الدخول','nav.logout':'تسجيل الخروج','nav.menu.open':'فتح القائمة','nav.menu.close':'إغلاق القائمة','nav.theme.light':'تفعيل المظهر الفاتح','nav.theme.dark':'تفعيل المظهر الداكن','nav.light':'فاتح','nav.dark':'داكن','nav.language':'اللغة',
+    'nav.courses':'الكورسات','nav.categories':'التصنيفات','language.ar':'العربية','language.en':'English','nav.admin':'الإدارة','nav.account':'حسابي','nav.login':'تسجيل الدخول','nav.logout':'تسجيل الخروج','nav.menu.open':'فتح القائمة','nav.menu.close':'إغلاق القائمة','nav.theme.light':'تفعيل المظهر الفاتح','nav.theme.dark':'تفعيل المظهر الداكن','nav.light':'فاتح','nav.dark':'داكن','nav.language':'اللغة',
     'common.loading':'جاري التحميل...','common.retry':'إعادة المحاولة','common.save':'حفظ','common.saving':'جاري الحفظ...','common.cancel':'إلغاء','common.close':'إغلاق','common.back':'رجوع','common.send':'إرسال','common.add':'إضافة','common.edit':'تعديل','common.delete':'حذف','common.open':'فتح','common.details':'التفاصيل','common.next':'التالي','common.previous':'السابق','common.error':'حدث خطأ','common.unexpected':'حدث خطأ غير متوقع.','common.noResults':'لا توجد نتائج','common.noData':'لا يوجد بعد','common.student':'طالب','common.admin':'مدير','common.course':'كورس','common.lesson':'درس',
     'home.badge':'منصة تعليمية مجانية','home.title':'اتعلم مهارات جديدة بخطوات واضحة.','home.description':'كورسات مرتبة، دروس عملية، وتجربة تعلم هادئة تساعدك تبدأ وتكمل بدون تعقيد.','home.explore':'استكشف الكورسات','home.browse':'تصفح التصنيفات','home.latest':'أحدث الكورسات','home.latestDesc':'محتوى مرتب لتبدأ مباشرة.','home.allCourses':'كل الكورسات','home.categories':'التصنيفات','home.categoriesDesc':'اختر المجال الذي تريد تطويره.','home.studentOnly':'محتوى خاص بالطلاب','home.loginRequired':'الكورسات والدروس متاحة بعد تسجيل الدخول','home.loginRequiredDesc':'احفظ تقدمك، افتح الدروس، وتابع رحلتك التعليمية من حسابك. الزائر لن يرى أسماء الكورسات أو محتوى الدروس.','home.customerService':'خدمة العملاء','home.supportFallback':'بيانات الدعم يضيفها صاحب المنصة من لوحة الإدارة.','home.noCourses':'لا توجد كورسات منشورة بعد.','home.freeAccount':'إنشاء حساب مجاني','home.login':'تسجيل الدخول','home.education':'تعليم',
     'courses.badge':'تعلم بخطوات واضحة','courses.title':'الكورسات','courses.description':'ابحث، فلتر، ورتّب المحتوى وابدأ التعلم.','courses.search':'ابحث عن كورس...','courses.category':'التصنيف','courses.allCategories':'كل التصنيفات','courses.sort':'الترتيب','courses.newest':'الأحدث','courses.name':'الاسم','courses.lessons':'عدد الدروس','courses.clear':'مسح الفلاتر','courses.result':'كورس','courses.emptyTitle':'مفيش كورسات مطابقة للبحث','courses.emptyDesc':'جرّب كلمة مختلفة أو امسح الفلاتر.','courses.showAll':'عرض كل الكورسات','courses.retry':'إعادة المحاولة','courses.error':'تعذر تحميل الكورسات.','courses.lessonCount':'درس','courses.details':'التفاصيل',
@@ -19,7 +19,7 @@ const translations = {
     'footer.tagline':'تعلم مجانًا، بخطوات واضحة.'
   },
   en: {
-    'nav.courses':'Courses','nav.categories':'Categories','nav.admin':'Admin','nav.account':'My Account','nav.login':'Sign in','nav.logout':'Sign out','nav.menu.open':'Open menu','nav.menu.close':'Close menu','nav.theme.light':'Switch to light mode','nav.theme.dark':'Switch to dark mode','nav.light':'Light','nav.dark':'Dark','nav.language':'Language',
+    'nav.courses':'Courses','nav.categories':'Categories','language.ar':'Arabic','language.en':'English','nav.admin':'Admin','nav.account':'My Account','nav.login':'Sign in','nav.logout':'Sign out','nav.menu.open':'Open menu','nav.menu.close':'Close menu','nav.theme.light':'Switch to light mode','nav.theme.dark':'Switch to dark mode','nav.light':'Light','nav.dark':'Dark','nav.language':'Language',
     'common.loading':'Loading...','common.retry':'Try again','common.save':'Save','common.saving':'Saving...','common.cancel':'Cancel','common.close':'Close','common.back':'Back','common.send':'Send','common.add':'Add','common.edit':'Edit','common.delete':'Delete','common.open':'Open','common.details':'Details','common.next':'Next','common.previous':'Previous','common.error':'Error','common.unexpected':'Something went wrong.','common.noResults':'No results','common.noData':'Not available yet','common.student':'Student','common.admin':'Admin','common.course':'Course','common.lesson':'Lesson',
     'home.badge':'Free learning platform','home.title':'Learn new skills, one clear step at a time.','home.description':'Organized courses, practical lessons, and a calm learning experience that helps you start and keep going without the complexity.','home.explore':'Explore courses','home.browse':'Browse categories','home.latest':'Latest courses','home.latestDesc':'Organized content to help you start right away.','home.allCourses':'All courses','home.categories':'Categories','home.categoriesDesc':'Choose the area you want to develop.','home.studentOnly':'Student-only content','home.loginRequired':'Courses and lessons are available after signing in','home.loginRequiredDesc':'Save your progress, open lessons, and continue your learning journey from your account. Visitors cannot see course names or lesson content.','home.customerService':'Customer support','home.supportFallback':'Support details are managed by the platform owner.','home.noCourses':'No published courses yet.','home.freeAccount':'Create a free account','home.login':'Sign in','home.education':'Education',
     'courses.badge':'Learn with clear steps','courses.title':'Courses','courses.description':'Search, filter, sort, and start learning.','courses.search':'Search for a course...','courses.category':'Category','courses.allCategories':'All categories','courses.sort':'Sort by','courses.newest':'Newest','courses.name':'Name','courses.lessons':'Number of lessons','courses.clear':'Clear filters','courses.result':'course','courses.emptyTitle':'No courses match your search','courses.emptyDesc':'Try a different keyword or clear the filters.','courses.showAll':'Show all courses','courses.retry':'Try again','courses.error':'Unable to load courses.','courses.lessonCount':'lessons','courses.details':'Details',
@@ -35,7 +35,18 @@ const translations = {
 } as const;
 
 export type TranslationKey = keyof typeof translations.en;
-export function t(key: TranslationKey, locale: Locale = getStoredLocale()): string { return translations[locale][key] ?? translations.en[key] ?? key; }
+
+// Keep both locale dictionaries structurally aligned at compile time.
+// TranslationKey is intentionally derived from the English dictionary so callers
+// can only use keys that exist in the canonical dictionary.
+type TranslationKeyParity =
+  Exclude<keyof typeof translations.en, keyof typeof translations.ar> |
+  Exclude<keyof typeof translations.ar, keyof typeof translations.en>;
+const translationKeyParityCheck: TranslationKeyParity extends never ? true : never = true;
+
+export function t(key: TranslationKey, locale: Locale = getStoredLocale()): string {
+  return translations[locale][key] ?? translations.en[key] ?? key;
+}
 export function getStoredLocale(): Locale { return localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ar'; }
 
 type Ctx = { locale: Locale; setLocale: (locale: Locale) => void; t: (key: TranslationKey) => string };

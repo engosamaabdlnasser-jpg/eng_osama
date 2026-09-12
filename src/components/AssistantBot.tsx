@@ -7,18 +7,13 @@ import type { Conversation, ConversationMessage, Profile } from '../types';
 
 type LocalMessage = { id: string; from: 'bot' | 'user'; text: string };
 
-function answer(text: string, t: (key: import('../i18n').TranslationKey) => string) {
-  const normalized = text.trim().toLowerCase();
-  if (normalized.includes('ابدأ') || normalized.includes('ابدء') || normalized.includes('start')) return t('assistant.startHelp');
-  if (normalized.includes('مش شغال') || normalized.includes('لا يعمل') || normalized.includes('الفيديو') || normalized.includes('فيديو') || normalized.includes('video')) return t('assistant.videoHelp');
-  if (normalized.includes('دعم') || normalized.includes('مشكلة') || normalized.includes('مشكل') || normalized.includes('support')) return t('assistant.supportIntro');
-  if (normalized.includes('حساب') || normalized.includes('تسجيل') || normalized.includes('account') || normalized.includes('login')) return t('assistant.accountHelp');
-  if (normalized.includes('كورس') || normalized.includes('درس') || normalized.includes('course') || normalized.includes('lesson')) return t('assistant.courseHelp');
-  return t('assistant.help');
-}
+// Recent turns sent to the AI on every request. Kept short on purpose:
+// there is no persisted conversation memory yet (that is Phase 2C P2), and
+// sending the full session history on every call would be wasteful.
+const AI_CONTEXT_WINDOW = 12;
 
 export default function AssistantBot() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -29,6 +24,8 @@ export default function AssistantBot() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [supportMessages, setSupportMessages] = useState<ConversationMessage[]>([]);
   const [messages, setMessages] = useState<LocalMessage[]>([{ id: 'welcome', from: 'bot', text: t('assistant.welcome') }]);
+  const [thinking, setThinking] = useState(false);
+  const [lastFailedText, setLastFailedText] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const humanActive = Boolean(conversation && ['WAITING_FOR_HUMAN', 'ASSIGNED', 'HUMAN_ACTIVE', 'WAITING_FOR_STUDENT', 'REOPENED'].includes(conversation.status));
@@ -84,9 +81,36 @@ export default function AssistantBot() {
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, supportMessages, open, supportOpen]);
 
+  const requestAiReply = async (history: LocalMessage[]) => {
+    if (!supabase) {
+      setMessages(prev => [...prev, { id: `err-${Date.now()}`, from: 'bot', text: t('assistant.offline') }]);
+      return;
+    }
+    setThinking(true);
+    try {
+      const payloadMessages = history
+        .filter(message => message.id !== 'welcome')
+        .slice(-AI_CONTEXT_WINDOW)
+        .map(message => ({ role: message.from === 'user' ? 'user' : 'assistant', content: message.text }));
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { messages: payloadMessages, language: locale },
+      });
+      if (error) throw error;
+      const reply = typeof data?.reply === 'string' && data.reply.trim() ? data.reply.trim() : t('assistant.replyError');
+      setMessages(prev => [...prev, { id: `bot-${Date.now()}`, from: 'bot', text: reply }]);
+      setLastFailedText(null);
+    } catch {
+      const failedText = history[history.length - 1]?.text ?? null;
+      setMessages(prev => [...prev, { id: `err-${Date.now()}`, from: 'bot', text: t('assistant.replyError') }]);
+      setLastFailedText(failedText);
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const sendMessage = (value = input) => {
     const text = value.trim();
-    if (!text) return;
+    if (!text || thinking) return;
     if (humanActive) {
       setSupportOpen(true);
       setSupportText(text);
@@ -94,8 +118,18 @@ export default function AssistantBot() {
       return;
     }
     const stamp = Date.now().toString();
-    setMessages(prev => [...prev, { id: `${stamp}-u`, from: 'user', text }, { id: `${stamp}-b`, from: 'bot', text: answer(text, t) }]);
+    const userMessage: LocalMessage = { id: `${stamp}-u`, from: 'user', text };
+    const history = [...messages, userMessage];
     setInput('');
+    setMessages(history);
+    void requestAiReply(history);
+  };
+
+  const retryLastMessage = () => {
+    if (!lastFailedText || thinking) return;
+    const text = lastFailedText;
+    setLastFailedText(null);
+    sendMessage(text);
   };
 
   const sendSupport = async () => {
@@ -137,6 +171,8 @@ export default function AssistantBot() {
           {conversation && <div className="assistant-support-box"><div className="assistant-support-title"><LifeBuoy size={17}/>{t('assistant.supportTitle')}</div><textarea value={supportText} onChange={e => setSupportText(e.target.value)} placeholder={t('assistant.supportPlaceholder')} rows={3}/><div className="assistant-support-actions"><button className="btn btn-ghost" onClick={() => setSupportOpen(false)}>{t('assistant.back')}</button><button className="btn btn-primary" disabled={sending || !supportText.trim()} onClick={sendSupport}>{sending ? t('assistant.sending') : t('common.send')}</button></div></div>}
         </> : <>
           {messages.map(message => <div key={message.id} className={`assistant-message ${message.from}`}>{message.text}</div>)}
+          {thinking && <div className="assistant-message bot" aria-live="polite" style={{ opacity: .65 }}>{t('assistant.thinking')}</div>}
+          {lastFailedText && !thinking && <button type="button" className="assistant-retry" onClick={retryLastMessage}>{t('assistant.retry')}</button>}
           <div className="assistant-quick">
             <button onClick={() => sendMessage(t('assistant.start'))}>{t('assistant.start')}</button>
             <button onClick={() => sendMessage(t('assistant.course'))}>{t('assistant.course')}</button>
@@ -144,7 +180,7 @@ export default function AssistantBot() {
           </div>
         </>}
       </div>
-      {!supportOpen && <div className="assistant-composer"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }} placeholder={t('assistant.placeholder')} aria-label={t('assistant.message')}/><button onClick={() => sendMessage()} disabled={!input.trim()} aria-label={t('assistant.send')}><Send size={17}/></button></div>}
+      {!supportOpen && <div className="assistant-composer"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }} placeholder={t('assistant.placeholder')} aria-label={t('assistant.message')} disabled={thinking}/><button onClick={() => sendMessage()} disabled={!input.trim() || thinking} aria-label={t('assistant.send')}><Send size={17}/></button></div>}
       {!supportOpen && <button className="assistant-support-link" onClick={() => setSupportOpen(true)}><LifeBuoy size={16}/> {t('assistant.support')}</button>}
     </section>}
     <button className={`assistant-fab ${open ? 'active' : ''}`} onClick={() => setOpen(v => !v)} aria-label={open ? t('assistant.close') : t('assistant.open')}>{open ? <ChevronDown size={24}/> : <MessageCircle size={25}/>}<span>{t('assistant.title').split(' ')[0]}</span></button>

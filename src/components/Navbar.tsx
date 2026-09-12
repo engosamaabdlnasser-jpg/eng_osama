@@ -6,11 +6,8 @@ import { getProfile, getSiteSettings } from '../services/data';
 import type { Profile } from '../types';
 import { useTheme } from './ThemeProvider';
 import { componentStyle } from './EditableRegion';
-import LanguageSwitcher from './LanguageSwitcher';
-import { useI18n } from '../i18n';
 
 export default function Navbar(){
-  const {t}=useI18n();
   const [open,setOpen]=useState(false);
   const [profile,setProfile]=useState<Profile|null>(null);
   const [logoUrl,setLogoUrl]=useState('/eng-osama-symbol-light.png');
@@ -47,19 +44,19 @@ export default function Navbar(){
   const headerStyle = componentStyle((siteSettings as any)?.component_editor?.['global.header']);
   return <header className="site-header" style={headerStyle}><div className="container navbar-inner">
     <Link to="/" className="brand" onClick={close}>{brand}</Link>
-    <nav className="desktop-nav"><LanguageSwitcher/>
-      {profile && <><NavLink to="/courses">{t('nav.courses')}</NavLink><NavLink to="/categories">{t('nav.categories')}</NavLink></>}
-      {profile?.role === 'admin' && <NavLink to="/admin">{t('nav.admin')}</NavLink>}
-      <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? t('nav.light') : t('nav.dark')} aria-label={theme === 'dark' ? t('nav.light') : t('nav.dark')}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
-      {profile ? <Link className="btn btn-ghost account-link" to="/account"><UserCircle2 size={17}/> {t('nav.account')}</Link> : <Link className="btn btn-primary" to="/login"><LogIn size={17}/> {t('nav.login')}</Link>}
+    <nav className="desktop-nav">
+      {profile && <><NavLink to="/courses">الكورسات</NavLink><NavLink to="/categories">التصنيفات</NavLink></>}
+      {profile?.role === 'admin' && <NavLink to="/admin">الإدارة</NavLink>}
+      <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'} aria-label={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
+      {profile ? <Link className="btn btn-ghost account-link" to="/account"><UserCircle2 size={17}/> حسابي</Link> : <Link className="btn btn-primary" to="/login"><LogIn size={17}/> تسجيل الدخول</Link>}
     </nav>
-    <button className="btn btn-ghost mobile-menu-btn" onClick={()=>setOpen(!open)} aria-label={open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={open} aria-controls="mobile-navigation">{open?<X/>:<Menu/>}</button>
+    <button className="btn btn-ghost mobile-menu-btn" onClick={()=>setOpen(!open)} aria-label={open ? "إغلاق القائمة" : "فتح القائمة"} aria-expanded={open} aria-controls="mobile-navigation">{open?<X/>:<Menu/>}</button>
   </div>
   {open&&<div id="mobile-navigation" className="container mobile-menu">
-    {profile && <><Link to="/courses" onClick={close}><BookOpen size={17}/> {t('nav.courses')}</Link><Link to="/categories" onClick={close}>{t('nav.categories')}</Link></>}
-    {profile?.role === 'admin' && <Link to="/admin" onClick={close}>{t('nav.admin')}</Link>}
-    <button className="mobile-theme" onClick={toggleTheme}>{theme === 'dark' ? <><Sun size={17}/> {t('nav.light')}</> : <><Moon size={17}/> {t('nav.dark')}</>}</button>
-    {profile ? <Link to="/account" onClick={close}><UserCircle2 size={17}/> {t('nav.account')}</Link> : <Link to="/login" onClick={close}><LogIn size={17}/> {t('nav.login')}</Link>}
+    {profile && <><Link to="/courses" onClick={close}><BookOpen size={17}/> الكورسات</Link><Link to="/categories" onClick={close}>التصنيفات</Link></>}
+    {profile?.role === 'admin' && <Link to="/admin" onClick={close}>الإدارة</Link>}
+    <button className="mobile-theme" onClick={toggleTheme}>{theme === 'dark' ? <><Sun size={17}/> المظهر الفاتح</> : <><Moon size={17}/> المظهر الداكن</>}</button>
+    {profile ? <Link to="/account" onClick={close}><UserCircle2 size={17}/> حسابي</Link> : <Link to="/login" onClick={close}><LogIn size={17}/> تسجيل الدخول</Link>}
   </div>}
   </header>
 }

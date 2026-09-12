@@ -5,9 +5,8 @@ import { getCourse, getCompleted, markLessonComplete } from '../services/data';
 import { youtubeEmbedUrl } from '../utils/youtube';
 import type { Course } from '../types';
 import { supabase } from '../lib/supabase';
-import { useI18n, localized } from '../i18n';
 
-export default function Lesson() { const {t,locale}=useI18n();
+export default function Lesson() {
   const { courseId, lessonId } = useParams();
   const [course, setCourse] = useState<Course | null>(null);
   const [done, setDone] = useState(false);
@@ -53,27 +52,27 @@ export default function Lesson() { const {t,locale}=useI18n();
   }
 
   return <section className="section"><div className="container lesson-page">
-    <Link to={`/courses/${course.id}`} className="muted lesson-back"><ChevronRight size={16}/> {t('lesson.back')}</Link>
+    <Link to={`/courses/${course.id}`} className="muted lesson-back"><ChevronRight size={16}/> العودة للكورس</Link>
     <div className="lesson-layout">
       <main className="surface" style={{ overflow: 'hidden' }}>
         <div className="video-frame">
-          {embed ? <iframe src={embed} title={localized(lesson.title,lesson.title_ar,lesson.title_en,locale)} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /> : <div className="video-error">{t('lesson.invalidVideo')}</div>}
+          {embed ? <iframe src={embed} title={lesson.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /> : <div className="video-error">رابط YouTube غير صالح.</div>}
         </div>
         <div style={{ padding: 24 }}>
           <div className="lesson-meta"><span className="tag">الدرس {lesson.sort_order}</span><span className="muted">{index + 1} / {lessons.length}</span></div>
-          <h1 style={{ fontSize: 'clamp(28px,4vw,40px)', margin: '10px 0' }}>{localized(lesson.title,lesson.title_ar,lesson.title_en,locale)}</h1>
-          <p className="muted" style={{ lineHeight: 2 }}>{localized(lesson.description,lesson.description_ar,lesson.description_en,locale)}</p>
+          <h1 style={{ fontSize: 'clamp(28px,4vw,40px)', margin: '10px 0' }}>{lesson.title}</h1>
+          <p className="muted" style={{ lineHeight: 2 }}>{lesson.description}</p>
           <div className="lesson-actions">
-            <button className="btn btn-primary" disabled={busy} onClick={complete}>{done ? <><CheckCircle2 size={18}/> {t('lesson.completed')}</> : busy ? t('lesson.save') : t('lesson.markComplete')}</button>
-            {previous && <Link className="btn btn-ghost" to={`/courses/${course.id}/lessons/${previous.id}`}><ChevronRight size={17}/> {t('lesson.previous')}</Link>}
-            {next && <Link className="btn btn-ghost" to={`/courses/${course.id}/lessons/${next.id}`}>{t('lesson.next')} <ChevronLeft size={17}/></Link>}
+            <button className="btn btn-primary" disabled={busy} onClick={complete}>{done ? <><CheckCircle2 size={18}/> تم إكمال الدرس</> : busy ? 'جاري الحفظ...' : 'تحديد كدرس مكتمل'}</button>
+            {previous && <Link className="btn btn-ghost" to={`/courses/${course.id}/lessons/${previous.id}`}><ChevronRight size={17}/> السابق</Link>}
+            {next && <Link className="btn btn-ghost" to={`/courses/${course.id}/lessons/${next.id}`}>التالي <ChevronLeft size={17}/></Link>}
           </div>
         </div>
       </main>
 
       <aside className="surface lesson-sidebar">
-        <div className="lesson-sidebar-head"><div><span className="tag">{t('course.curriculum')}</span><h2>{localized(course.title,course.title_ar,course.title_en,locale)}</h2></div><ListChecks size={20}/></div>
-        <div className="lesson-list">{lessons.map((item, i) => <Link key={item.id} to={`/courses/${course.id}/lessons/${item.id}`} className={`lesson-nav-item ${item.id === lesson.id ? 'active' : ''}`}><span>{i + 1}</span><div>{localized(item.title,item.title_ar,item.title_en,locale)}<small>{item.id === lesson.id ? t('lesson.watching') : ''}</small></div></Link>)}</div>
+        <div className="lesson-sidebar-head"><div><span className="tag">المنهج</span><h2>{course.title}</h2></div><ListChecks size={20}/></div>
+        <div className="lesson-list">{lessons.map((item, i) => <Link key={item.id} to={`/courses/${course.id}/lessons/${item.id}`} className={`lesson-nav-item ${item.id === lesson.id ? 'active' : ''}`}><span>{i + 1}</span><div>{item.title}<small>{item.id === lesson.id ? 'تشاهده الآن' : ''}</small></div></Link>)}</div>
       </aside>
     </div>
   </div></section>;

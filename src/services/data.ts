@@ -13,9 +13,6 @@ export const demoCourses: Course[] = [
 ];
 
 export const defaultSiteSettings: SiteSettings = {
-  assistant_enabled: true,
-  assistant_ai_enabled: true,
-  assistant_support_enabled: true,
   brand_name: 'ENG OSAMA',
   logo_url: '/logo.png',
   hero_badge: 'منصة تعليمية مجانية',
@@ -275,27 +272,4 @@ export async function getAdminStudentDetails(userId: string): Promise<AdminStude
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error('لم يتم العثور على بيانات الطالب.');
   return row as AdminStudentDetails;
-}
-
-export type AssistantConversation={id:string;user_id:string|null;title:string|null;status:'open'|'resolved'|'closed';created_at:string;updated_at:string};
-export type AssistantMessage={id:string;conversation_id:string;user_id:string|null;role:'user'|'assistant'|'admin';content:string;created_at:string};
-export async function recordAssistantMessage(userId:string, role:'user'|'assistant', content:string, title?:string){
-  if(!supabase)return null;
-  const {data:existing}=await supabase.from('assistant_conversations').select('*').eq('user_id',userId).eq('status','open').order('updated_at',{ascending:false}).limit(1).maybeSingle();
-  let conversation=existing as AssistantConversation|null;
-  if(!conversation){const {data,error}=await supabase.from('assistant_conversations').insert({user_id:userId,title:title||'Assistant conversation'}).select().single();if(error)throw error;conversation=data as AssistantConversation;}
-  const {error}=await supabase.from('assistant_messages').insert({conversation_id:conversation.id,user_id:userId,role,content});if(error)throw error;
-  await supabase.from('assistant_conversations').update({updated_at:new Date().toISOString(),title:title||conversation.title}).eq('id',conversation.id);
-  return conversation.id;
-}
-export async function getAssistantInbox(){if(!supabase) return [];const {data,error}=await supabase.from('assistant_conversations').select('*').order('updated_at',{ascending:false});if(error)throw error;return (data??[]) as AssistantConversation[];}
-export async function getAssistantMessages(conversationId:string){if(!supabase)return [];const {data,error}=await supabase.from('assistant_messages').select('*').eq('conversation_id',conversationId).order('created_at',{ascending:true});if(error)throw error;return (data??[]) as AssistantMessage[];}
-export async function sendAdminAssistantMessage(conversationId:string, content:string){if(!supabase)throw new Error('Supabase غير مربوط.');const {data:user}=await supabase.auth.getUser();if(!user.user)throw new Error('يجب تسجيل الدخول.');const {error}=await supabase.from('assistant_messages').insert({conversation_id:conversationId,user_id:user.user.id,role:'admin',content});if(error)throw error;await supabase.from('assistant_conversations').update({updated_at:new Date().toISOString()}).eq('id',conversationId);}
-
-export async function askAssistantAI(userId:string, messages:{role:'user'|'assistant';content:string}[], locale:'ar'|'en', path:string){
-  if(!supabase) return null;
-  const {data,error}=await supabase.functions.invoke('assistant-chat',{body:{messages,locale,path,user_id:userId}});
-  if(error) throw error;
-  if(data?.error) throw new Error(data.error);
-  return String(data?.answer||'');
 }

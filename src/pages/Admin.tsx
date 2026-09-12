@@ -1,14 +1,16 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, UsersRound, X, UserRound, Mail, Phone, CalendarDays, ShieldCheck, BookOpenCheck, Images, Trash2, Upload, RefreshCw, HardDrive } from 'lucide-react';
+import { LayoutDashboard, Settings, UsersRound, X, UserRound, Mail, Phone, CalendarDays, ShieldCheck, BookOpenCheck, Images, Trash2, Upload, RefreshCw, HardDrive, MessageCircle, CheckCircle2, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAdminStudentDetails, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo, uploadSiteInstructorImage, uploadSiteAsset, getManagedSiteAssets, deleteManagedSiteAsset, uploadManagedAsset } from '../services/data';
-import type { AdminStudentDetails, Category, Course, HomeExtraSection, Profile, SiteSettings, StudentMonitorRow } from '../types';
+import { useI18n } from '../i18n';
+import { createCategory, defaultSiteSettings, deleteCategory, getAdminProfiles, getAdminStudentDetails, getAllCourses, getCategories, getProfile, getSiteSettings, getStudentMonitorData, renameCategory, saveSiteSettings, setUserRole, uploadSiteLogo, uploadSiteInstructorImage, uploadSiteAsset, getManagedSiteAssets, deleteManagedSiteAsset, uploadManagedAsset, getAdminSupportConversations, getConversationMessages, acceptSupportConversation, sendAdminConversationMessage, updateSupportConversationStatus } from '../services/data';
+import type { AdminStudentDetails, Category, Course, HomeExtraSection, Profile, SiteSettings, StudentMonitorRow, Conversation, ConversationMessage } from '../types';
 import type { ManagedSiteAsset } from '../services/data';
 
 const emptyExtra: HomeExtraSection = { enabled: false, title: '', description: '', button_label: '', button_url: '' };
 
 export default function Admin() {
+  const { t } = useI18n();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
@@ -18,7 +20,13 @@ export default function Admin() {
   const [newCat, setNewCat] = useState('');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
-  const [tab, setTab] = useState<'overview'|'content'|'visual'|'assets'|'students'>('overview');
+  const [tab, setTab] = useState<'overview'|'content'|'visual'|'assets'|'students'|'support'>('overview');
+  const [supportConversations, setSupportConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportReply, setSupportReply] = useState('');
+  const [supportActionLoading, setSupportActionLoading] = useState(false);
   const [visualTarget, setVisualTarget] = useState('header');
   const [componentTarget, setComponentTarget] = useState('home.hero');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -31,6 +39,78 @@ export default function Admin() {
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [assetUploading, setAssetUploading] = useState(false);
   const nav = useNavigate();
+
+  async function loadSupportInbox() {
+    if (!supabase) return;
+    setSupportLoading(true);
+    try {
+      const rows = await getAdminSupportConversations();
+      setSupportConversations(rows);
+      if (selectedConversation) {
+        const fresh = rows.find(row => row.id === selectedConversation.id) ?? null;
+        setSelectedConversation(fresh);
+        if (fresh) setConversationMessages(await getConversationMessages(fresh.id));
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر تحميل محادثات الدعم.');
+    } finally { setSupportLoading(false); }
+  }
+
+  async function openSupportConversation(conversation: Conversation) {
+    setSelectedConversation(conversation);
+    try { setConversationMessages(await getConversationMessages(conversation.id)); }
+    catch (e) { setError(e instanceof Error ? e.message : 'تعذر تحميل الرسائل.'); }
+  }
+
+  async function acceptConversation(conversation: Conversation) {
+    setSupportActionLoading(true);
+    try {
+      const updated = await acceptSupportConversation(conversation.id);
+      setSelectedConversation(updated);
+      setSupportConversations(prev => prev.map(row => row.id === updated.id ? updated : row));
+      setConversationMessages(await getConversationMessages(updated.id));
+      setMsg(t('support.accepted'));
+    } catch (e) { setError(e instanceof Error ? e.message : 'تعذر قبول المحادثة. قد تكون أُخذت بالفعل.'); await loadSupportInbox(); }
+    finally { setSupportActionLoading(false); }
+  }
+
+  async function replyToConversation() {
+    if (!selectedConversation || !supportReply.trim()) return;
+    setSupportActionLoading(true);
+    try {
+      const message = await sendAdminConversationMessage(selectedConversation.id, supportReply);
+      setConversationMessages(prev => [...prev, message]);
+      setSupportReply('');
+      setSupportConversations(prev => prev.map(row => row.id === selectedConversation.id ? { ...row, last_message_at: message.created_at, updated_at: message.created_at, admin_replied_at: row.admin_replied_at ?? message.created_at, status: 'HUMAN_ACTIVE' } : row));
+      setSelectedConversation(prev => prev ? { ...prev, last_message_at: message.created_at, updated_at: message.created_at, admin_replied_at: prev.admin_replied_at ?? message.created_at, status: 'HUMAN_ACTIVE' } : prev);
+    } catch (e) { setError(e instanceof Error ? e.message : t('support.replyError')); }
+    finally { setSupportActionLoading(false); }
+  }
+
+  async function toggleRetentionExempt(conversation: Conversation) {
+    if (!supabase) return;
+    setSupportActionLoading(true);
+    try {
+      const { data, error } = await supabase.from('conversations').update({ retention_exempt: !conversation.retention_exempt }).eq('id', conversation.id).select('*').single();
+      if (error) throw error;
+      const updated = data as Conversation;
+      setSelectedConversation(updated);
+      setSupportConversations(prev => prev.map(row => row.id === updated.id ? updated : row));
+    } catch (e) { setError(e instanceof Error ? e.message : 'تعذر تغيير سياسة الاحتفاظ.'); }
+    finally { setSupportActionLoading(false); }
+  }
+
+  async function changeConversationStatus(status: Conversation['status']) {
+    if (!selectedConversation) return;
+    setSupportActionLoading(true);
+    try {
+      const updated = await updateSupportConversationStatus(selectedConversation.id, status);
+      setSelectedConversation(updated);
+      setSupportConversations(prev => prev.map(row => row.id === updated.id ? updated : row));
+      setMsg(status === 'RESOLVED' ? t('support.resolved') : t('support.updated'));
+    } catch (e) { setError(e instanceof Error ? e.message : 'تعذر تحديث حالة المحادثة.'); }
+    finally { setSupportActionLoading(false); }
+  }
 
   async function load() {
     if (!supabase) { setError('Supabase غير مربوط. اربط المشروع بقاعدة البيانات لتفعيل لوحة الإدارة.'); return; }
@@ -57,6 +137,18 @@ export default function Admin() {
   }
 
   useEffect(() => { load().catch(e => setError(e instanceof Error ? e.message : 'حدث خطأ')); }, [nav]);
+  useEffect(() => {
+    if (!supabase || tab !== 'support') return;
+    const channel = supabase.channel('admin-support-inbox')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => { void loadSupportInbox(); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages' }, () => {
+        if (selectedConversation) getConversationMessages(selectedConversation.id).then(setConversationMessages).catch(() => {});
+        void loadSupportInbox();
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [tab, selectedConversation?.id]);
+
 
   async function togglePublished(course: Course) { if (!supabase) return; setError(''); setMsg(''); const { error } = await supabase.from('courses').update({ published: !course.published }).eq('id', course.id); if (error) setError(error.message); else { setMsg(course.published ? 'تم إخفاء الكورس.' : 'تم نشر الكورس.'); setCourses(xs => xs.map(x => x.id === course.id ? { ...x, published: !x.published } : x)); } }
   async function removeCourse(course: Course) { if (!supabase || !confirm(`حذف الكورس «${course.title}»؟ سيتم حذف دروسه أيضًا.`)) return; const { error } = await supabase.from('courses').delete().eq('id', course.id); if (error) setError(error.message); else { setMsg('تم حذف الكورس.'); setCourses(xs => xs.filter(x => x.id !== course.id)); } }
@@ -149,6 +241,7 @@ export default function Admin() {
       <button type="button" role="tab" aria-selected={tab==='visual'} className={tab==='visual'?'active':''} onClick={()=>setTab('visual')}><Settings size={17}/> المحرر البصري</button>
       <button type="button" role="tab" aria-selected={tab==='assets'} className={tab==='assets'?'active':''} onClick={()=>{setTab('assets');loadAssets();}}><Images size={17}/> مدير الملفات</button>
       <button type="button" role="tab" aria-selected={tab==='students'} className={tab==='students'?'active':''} onClick={()=>setTab('students')}><UsersRound size={17}/> مراقبة الطلاب</button>
+      <button type="button" role="tab" aria-selected={tab==='support'} className={tab==='support'?'active':''} onClick={()=>{setTab('support');loadSupportInbox();}}><MessageCircle size={17}/> دعم الطلاب</button>
     </div>
     {error&&<div className="error" style={{marginBottom:12}}>{error}</div>}{msg&&<div className="notice" style={{marginBottom:12}}>{msg}</div>}
 
@@ -214,6 +307,7 @@ export default function Admin() {
       <div className="settings-block"><h2>الهيدر والشريط العلوي</h2><div className="two-col"><div><label className="label">نص الشريط العلوي</label><input className="input" value={settings.announcement} onChange={e=>setSettings({...settings,announcement:e.target.value})} placeholder="اتركه فارغًا لإخفائه"/></div><div className="check-row"><label className="check"><input type="checkbox" checked={settings.show_categories} onChange={e=>setSettings({...settings,show_categories:e.target.checked})}/> عرض التصنيفات في الرئيسية</label><label className="check"><input type="checkbox" checked={settings.show_featured} onChange={e=>setSettings({...settings,show_featured:e.target.checked})}/> عرض أحدث الكورسات</label></div></div></div>
       <div className="settings-block"><h2>القسم الرئيسي</h2><div><label className="label">عنوان البطل</label><input className="input" value={settings.hero_badge} onChange={e=>setSettings({...settings,hero_badge:e.target.value})}/></div><div><label className="label">العنوان الرئيسي</label><textarea className="input" rows={3} value={settings.hero_title} onChange={e=>setSettings({...settings,hero_title:e.target.value})}/></div><div><label className="label">وصف الصفحة الرئيسية</label><textarea className="input" rows={4} value={settings.hero_description} onChange={e=>setSettings({...settings,hero_description:e.target.value})}/></div><div className="two-col"><div><label className="label">زر أساسي</label><input className="input" value={settings.primary_cta_label} onChange={e=>setSettings({...settings,primary_cta_label:e.target.value})}/></div><div><label className="label">زر ثانوي</label><input className="input" value={settings.secondary_cta_label} onChange={e=>setSettings({...settings,secondary_cta_label:e.target.value})}/></div></div></div>
       <div className="settings-block"><h2>شاشة الزائر وتسجيل الدخول</h2><p className="muted" style={{margin:0}}>الزائر غير المسجل لن يرى أسماء الكورسات أو الدروس. هنا تتحكم في الجزء التعريفي والدعم الظاهر بجانب تسجيل الدخول.</p><div className="two-col"><div><label className="label">عنوان شاشة الدخول</label><input className="input" value={settings.public_welcome_title} onChange={e=>setSettings({...settings,public_welcome_title:e.target.value})}/></div><div><label className="label">اسم صاحب المنصة</label><input className="input" value={settings.instructor_name} onChange={e=>setSettings({...settings,instructor_name:e.target.value})}/></div></div><div className="two-col"><div><label className="label">وصف شاشة الدخول</label><textarea className="input" rows={3} value={settings.public_welcome_description} onChange={e=>setSettings({...settings,public_welcome_description:e.target.value})}/></div><div><label className="label">صفة صاحب المنصة</label><input className="input" value={settings.instructor_role} onChange={e=>setSettings({...settings,instructor_role:e.target.value})}/></div></div><div><label className="label">الصورة الشخصية لصاحب المنصة</label><input className="input" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleInstructorUpload} disabled={uploadingInstructor}/><div className="muted small" style={{marginTop:6}}>{uploadingInstructor?'جاري رفع الصورة...':'حتى 4MB — الصورة اختيارية ويمكن تغييرها لاحقًا'}</div>{settings.instructor_image_url&&<img className="admin-image-preview" src={settings.instructor_image_url} alt="معاينة الصورة الشخصية لصاحب المنصة"/>}</div><div className="two-col"><div><label className="label">عنوان الدعم</label><input className="input" value={settings.support_title} onChange={e=>setSettings({...settings,support_title:e.target.value})}/></div><div><label className="label">مواعيد الدعم</label><input className="input" value={settings.support_hours} onChange={e=>setSettings({...settings,support_hours:e.target.value})}/></div></div><div className="two-col"><div><label className="label">رقم الهاتف</label><input className="input" value={settings.support_phone} onChange={e=>setSettings({...settings,support_phone:e.target.value})} placeholder="اختياري"/></div><div><label className="label">رقم واتساب</label><input className="input" value={settings.support_whatsapp} onChange={e=>setSettings({...settings,support_whatsapp:e.target.value})} placeholder="مثال: 2010..."/></div></div><div><label className="label">بريد خدمة العملاء</label><input className="input" type="email" value={settings.support_email} onChange={e=>setSettings({...settings,support_email:e.target.value})} placeholder="اختياري"/></div></div>
+      <div className="settings-block" style={{marginTop:16}}><h3 style={{marginTop:0}}>Retention للدعم</h3><p className="muted small">العداد يبدأ عند Resolve/Close، وليس عند آخر رسالة من الأدمن. القيمة 0 تعني عدم الحذف التلقائي.</p><div className="two-col"><div><label className="label">مدة الاحتفاظ بمحادثات الدعم (بالساعات)</label><select className="input" value={settings.support_retention_human_hours} onChange={e=>setSettings({...settings,support_retention_human_hours:Number(e.target.value)})}><option value={24}>24 ساعة</option><option value={48}>48 ساعة</option><option value={72}>72 ساعة</option><option value={168}>7 أيام</option><option value={336}>14 يومًا</option><option value={720}>30 يومًا</option><option value={0}>Never</option></select></div><div><label className="label">مدة احتفاظ محادثات AI (للمرحلة التالية)</label><select className="input" value={settings.support_retention_ai_hours} onChange={e=>setSettings({...settings,support_retention_ai_hours:Number(e.target.value)})}><option value={24}>24 ساعة</option><option value={48}>48 ساعة</option><option value={72}>72 ساعة</option><option value={168}>7 أيام</option><option value={336}>14 يومًا</option><option value={720}>30 يومًا</option><option value={0}>Never</option></select></div></div></div>
       <div className="settings-block"><h2>التصنيفات والكورسات</h2><div className="two-col"><div><label className="label">عنوان التصنيفات</label><input className="input" value={settings.categories_title} onChange={e=>setSettings({...settings,categories_title:e.target.value})}/></div><div><label className="label">وصف التصنيفات</label><input className="input" value={settings.categories_description} onChange={e=>setSettings({...settings,categories_description:e.target.value})}/></div></div><div className="two-col"><div><label className="label">عنوان أحدث الكورسات</label><input className="input" value={settings.featured_title} onChange={e=>setSettings({...settings,featured_title:e.target.value})}/></div><div><label className="label">وصف أحدث الكورسات</label><input className="input" value={settings.featured_description} onChange={e=>setSettings({...settings,featured_description:e.target.value})}/></div></div><div><label className="label">نص الفوتر</label><input className="input" value={settings.footer_text} onChange={e=>setSettings({...settings,footer_text:e.target.value})}/></div></div>
       <div className="settings-block design-control-center"><div className="section-head" style={{marginBottom:12}}><div><h2 style={{margin:0}}>مركز التحكم في المظهر</h2><p className="muted" style={{margin:'4px 0 0'}}>تحكم في الألوان والخط والصور وشكل الواجهة من غير كود.</p></div><button type="button" className="btn btn-ghost" onClick={resetDesign}>إرجاع الافتراضي</button></div><div className="settings-subtitle">ألوان المظهر الفاتح</div><div className="color-grid">{[['light_bg','الخلفية'],['light_surface','الأسطح'],['light_text','النص'],['light_muted','النص الثانوي'],['light_border','الحدود'],['light_accent','اللون الأساسي'],['light_accent_soft','خلفية اللون الأساسي']].map(([key,label])=><label className="color-control" key={key}><span>{label}</span><input type="color" value={(settings as any)[key]} onChange={e=>setSettings({...settings,[key]:e.target.value})}/><code>{(settings as any)[key]}</code></label>)}</div><div className="settings-subtitle">ألوان المظهر الداكن</div><div className="color-grid">{[['dark_bg','الخلفية'],['dark_surface','الأسطح'],['dark_text','النص'],['dark_muted','النص الثانوي'],['dark_border','الحدود'],['dark_accent','اللون الأساسي'],['dark_accent_soft','خلفية اللون الأساسي']].map(([key,label])=><label className="color-control" key={key}><span>{label}</span><input type="color" value={(settings as any)[key]} onChange={e=>setSettings({...settings,[key]:e.target.value})}/><code>{(settings as any)[key]}</code></label>)}</div><div className="two-col"><div><label className="label">الخط العام</label><select className="input" value={settings.font_family} onChange={e=>setSettings({...settings,font_family:e.target.value})}><option>Cairo</option><option>Tajawal</option><option>Noto Kufi Arabic</option><option>IBM Plex Sans Arabic</option><option>Readex Pro</option></select></div><div><label className="label">استدارة العناصر</label><input className="input" value={settings.ui_radius} onChange={e=>setSettings({...settings,ui_radius:e.target.value})} placeholder="20px"/></div></div><div><label className="label">الظل العام</label><input className="input" value={settings.ui_shadow} onChange={e=>setSettings({...settings,ui_shadow:e.target.value})} placeholder="0 18px 50px rgba(15,23,42,.12)"/></div>
       <div className="settings-subtitle">تحكم بصري متقدم — بدون كتابة CSS</div>
@@ -249,7 +343,7 @@ export default function Admin() {
       </div>
       <div className="asset-manager-toolbar">
         <label className="btn btn-primary"><Upload size={17}/> {assetUploading?'جاري الرفع...':'رفع صورة'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={handleManagedAssetUpload} disabled={assetUploading} hidden /></label>
-        <button type="button" className="btn btn-ghost" onClick={loadAssets} disabled={assetsLoading}><RefreshCw size={17}/> تحديث</button>
+        <button type="button" className="btn btn-ghost" onClick={loadAssets} disabled={assetsLoading}><RefreshCw size={17}/> {t('support.refresh')}</button>
         <div className="storage-summary"><HardDrive size={18}/><div><strong>{formatBytes(assets.reduce((n,a)=>n+a.size,0))}</strong><span className="muted"> إجمالي الملفات المحمّلة حاليًا</span></div><small className="muted">هذا تقدير للملفات الظاهرة في Storage وليس حد الخطة.</small></div>
       </div>
       {assetsLoading&&<div className="empty">جاري تحميل الملفات...</div>}
@@ -260,6 +354,23 @@ export default function Admin() {
         <div className="asset-card-actions"><a className="btn btn-ghost btn-small" href={asset.url} target="_blank" rel="noreferrer">فتح</a><button type="button" className="btn btn-danger btn-small" onClick={()=>handleAssetDelete(asset)} disabled={current}><Trash2 size={15}/> حذف</button></div>
       </article>})}</div>}
       <div className="notice" style={{marginTop:16}}>💡 حذف الملفات القديمة غير المستخدمة يساعدك على عدم استهلاك مساحة Storage بلا داعٍ. الملفات المستخدمة حاليًا محمية من الحذف حتى تغيّرها أولًا.</div>
+    </div>}
+
+    {tab==='support'&&<div className="support-inbox-grid">
+      <div className="surface support-inbox-list">
+        <div className="admin-panel-head"><div><h2>{t('support.inbox')}</h2><p className="muted">{t('support.inboxDesc')}</p></div><button type="button" className="btn btn-ghost btn-small" onClick={loadSupportInbox} disabled={supportLoading}><RefreshCw size={15}/> {t('support.refresh')}</button></div>
+        {supportLoading&&<div className="empty compact">{t('support.loading')}</div>}
+        {!supportLoading&&!supportConversations.length&&<div className="empty compact">{t('support.empty')}</div>}
+        {!supportLoading&&supportConversations.map(conversation=>{const student=users.find(user=>user.id===conversation.student_id);return <button type="button" className={`support-conversation-row ${selectedConversation?.id===conversation.id?'active':''}`} key={conversation.id} onClick={()=>openSupportConversation(conversation)}><div><strong>{student?.full_name||t('support.student')}</strong><span className="muted small">{conversation.priority} • {conversation.status}</span></div><div className="small muted">{conversation.last_message_at?new Date(conversation.last_message_at).toLocaleString('ar-EG'):'—'}</div></button>})}
+      </div>
+      <div className="surface support-conversation-view">
+        {!selectedConversation?<div className="empty"><MessageCircle size={30}/><h3>{t('support.select')}</h3><p className="muted">{t('support.selectDesc')}</p></div>:<>
+          <div className="support-view-head"><div><span className="tag">{selectedConversation.status}</span><h2>{users.find(user=>user.id===selectedConversation.student_id)?.full_name||t('support.student')}</h2><p className="muted">{selectedConversation.priority} • {t('support.created')}: {new Date(selectedConversation.created_at).toLocaleString('ar-EG')}</p></div><div className="rtl-row">{selectedConversation.status==='WAITING_FOR_HUMAN'&&<button type="button" className="btn btn-primary" onClick={()=>acceptConversation(selectedConversation)} disabled={supportActionLoading}><CheckCircle2 size={16}/> {t('support.accept')}</button>}{!['RESOLVED','CLOSED'].includes(selectedConversation.status)&&<button type="button" className="btn btn-ghost" onClick={()=>changeConversationStatus('RESOLVED')} disabled={supportActionLoading}>{t('support.resolve')}</button>}{selectedConversation.status==='RESOLVED'&&<button type="button" className="btn btn-ghost" onClick={()=>changeConversationStatus('CLOSED')} disabled={supportActionLoading}>{t('support.close')}</button>}{['RESOLVED','RETENTION_PENDING','CLOSED'].includes(selectedConversation.status)&&<button type="button" className="btn btn-ghost" onClick={()=>toggleRetentionExempt(selectedConversation)} disabled={supportActionLoading}>{selectedConversation.retention_exempt?t('support.unkeep'):t('support.keep')}</button>}</div></div>
+          <div className="support-message-list">{conversationMessages.map(message=><div key={message.id} className={`support-message ${message.sender_role}` }><div className="support-message-meta">{message.sender_role} • {new Date(message.created_at).toLocaleString('ar-EG')}</div><div>{message.body}</div></div>)}{!conversationMessages.length&&<div className="empty compact">{t('support.noMessages')}</div>}</div>
+          {!['RESOLVED','CLOSED'].includes(selectedConversation.status)&&<div className="support-reply-box"><textarea value={supportReply} onChange={e=>setSupportReply(e.target.value)} rows={3} placeholder={t('support.replyPlaceholder')}/><button type="button" className="btn btn-primary" onClick={replyToConversation} disabled={supportActionLoading||!supportReply.trim()}><Send size={16}/> {t('common.send')}</button></div>}
+          {selectedConversation.auto_delete_at&&<div className="notice small">{t('support.retention').replace('{date}', new Date(selectedConversation.auto_delete_at).toLocaleString('ar-EG')).replace('{exempt}', selectedConversation.retention_exempt ? t('common.yes') : t('common.no'))}</div>}
+        </>}
+      </div>
     </div>}
 
     {tab==='students'&&<>

@@ -1,28 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, ChevronDown, LifeBuoy, MessageCircle, Send, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getProfile } from '../services/data';
-import type { Profile } from '../types';
+import { createStudentSupportConversation, getProfile, getStudentSupportConversation } from '../services/data';
+import { useI18n } from '../i18n';
+import type { Conversation, ConversationMessage, Profile } from '../types';
 
-type Message = { id: number; from: 'bot' | 'user'; text: string };
+type LocalMessage = { id: string; from: 'bot' | 'user'; text: string };
 
-const quickReplies = [
-  'مش عارف أبدأ منين',
-  'الكورس مش شغال',
-  'عايز أكلم الدعم',
-];
-
-function answer(text: string) {
-  const t = text.trim().toLowerCase();
-  if (t.includes('ابدأ') || t.includes('ابدء') || t.includes('أبدأ')) return 'ابدأ من صفحة الكورسات، واختار الكورس المناسب لك. حاول تمشي بالترتيب درسًا بعد درس، وكل درس تقدر تعلّمه كمكتمل بعد الانتهاء منه.';
-  if (t.includes('مش شغال') || t.includes('لا يعمل') || t.includes('الفيديو') || t.includes('فيديو')) return 'لو الدرس أو الفيديو مش شغال، جرّب تحديث الصفحة والتأكد من اتصال الإنترنت. لو المشكلة مستمرة، ابعتلي تفاصيل المشكلة من زر «إرسال للدعم» وأنا أجهز طلب للدعم.';
-  if (t.includes('دعم') || t.includes('مشكلة') || t.includes('مشكل')) return 'أكيد. أقدر أسجل لك طلب دعم داخل المنصة، وبعدها فريق الدعم يراجعه. اضغط «إرسال للدعم» واكتب المشكلة بالتفصيل.';
-  if (t.includes('حساب') || t.includes('تسجيل')) return 'لو المشكلة في تسجيل الدخول أو الحساب، استخدم صفحة تسجيل الدخول أو استعادة كلمة المرور. ولو ما اتحلتش، أرسل طلب للدعم وسنراجع المشكلة.';
-  if (t.includes('كورس') || t.includes('درس')) return 'تقدر تشوف الكورسات من قسم «الكورسات»، وتفتح أي كورس للوصول إلى الدروس ومتابعة تقدمك.';
-  return 'أنا مساعد ENG OSAMA داخل المنصة. أقدر أساعدك في التنقل، الكورسات والدروس، أو تسجيل مشكلة للدعم. لو سؤالك يحتاج تدخل من فريق الدعم اضغط «إرسال للدعم».';
+function answer(text: string, t: (key: import('../i18n').TranslationKey) => string) {
+  const normalized = text.trim().toLowerCase();
+  if (normalized.includes('ابدأ') || normalized.includes('ابدء') || normalized.includes('start')) return t('assistant.startHelp');
+  if (normalized.includes('مش شغال') || normalized.includes('لا يعمل') || normalized.includes('الفيديو') || normalized.includes('فيديو') || normalized.includes('video')) return t('assistant.videoHelp');
+  if (normalized.includes('دعم') || normalized.includes('مشكلة') || normalized.includes('مشكل') || normalized.includes('support')) return t('assistant.supportIntro');
+  if (normalized.includes('حساب') || normalized.includes('تسجيل') || normalized.includes('account') || normalized.includes('login')) return t('assistant.accountHelp');
+  if (normalized.includes('كورس') || normalized.includes('درس') || normalized.includes('course') || normalized.includes('lesson')) return t('assistant.courseHelp');
+  return t('assistant.help');
 }
 
 export default function AssistantBot() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [input, setInput] = useState('');
@@ -30,64 +26,126 @@ export default function AssistantBot() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 1, from: 'bot', text: 'أهلاً بيك 👋 أنا مساعد ENG OSAMA. قولّي محتاج إيه وأنا أساعدك.' },
-  ]);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [supportMessages, setSupportMessages] = useState<ConversationMessage[]>([]);
+  const [messages, setMessages] = useState<LocalMessage[]>([{ id: 'welcome', from: 'bot', text: t('assistant.welcome') }]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const humanActive = Boolean(conversation && ['WAITING_FOR_HUMAN', 'ASSIGNED', 'HUMAN_ACTIVE', 'WAITING_FOR_STUDENT', 'REOPENED'].includes(conversation.status));
+
+  useEffect(() => {
+    setMessages(prev => prev.length === 1 && prev[0].id === 'welcome' ? [{ id: 'welcome', from: 'bot', text: t('assistant.welcome') }] : prev);
+  }, [t]);
 
   useEffect(() => {
     let active = true;
     supabase?.auth.getUser().then(async ({ data }) => {
       if (!data.user || !active) return;
-      try { const p = await getProfile(data.user.id); if (active) setProfile(p); } catch {}
+      try {
+        const p = await getProfile(data.user.id);
+        if (active) setProfile(p);
+      } catch {
+        // Profile data is optional for the assistant.
+      }
     });
     return () => { active = false; };
   }, []);
 
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, open, supportOpen]);
+  const loadSupport = async () => {
+    if (!supabase) return;
+    try {
+      const result = await getStudentSupportConversation();
+      setConversation(result.conversation);
+      setSupportMessages(result.messages);
+    } catch {
+      // Keep the assistant usable even when support storage is temporarily unavailable.
+    }
+  };
+
+  useEffect(() => {
+    if (!supportOpen) return;
+    void loadSupport();
+  }, [supportOpen]);
+
+  useEffect(() => {
+    if (!supabase || !conversation?.id) return;
+    const channel = supabase.channel(`student-support-${conversation.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversation_messages', filter: `conversation_id=eq.${conversation.id}` }, payload => {
+        const incoming = payload.new as ConversationMessage;
+        setSupportMessages(prev => prev.some(message => message.id === incoming.id) ? prev : [...prev, incoming]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `id=eq.${conversation.id}` }, payload => {
+        setConversation(payload.new as Conversation);
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [conversation?.id]);
+
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, supportMessages, open, supportOpen]);
 
   const sendMessage = (value = input) => {
     const text = value.trim();
     if (!text) return;
-    setMessages(prev => [...prev, { id: Date.now(), from: 'user', text }, { id: Date.now() + 1, from: 'bot', text: answer(text) }]);
+    if (humanActive) {
+      setSupportOpen(true);
+      setSupportText(text);
+      setInput('');
+      return;
+    }
+    const stamp = Date.now().toString();
+    setMessages(prev => [...prev, { id: `${stamp}-u`, from: 'user', text }, { id: `${stamp}-b`, from: 'bot', text: answer(text, t) }]);
     setInput('');
   };
 
   const sendSupport = async () => {
-    if (!supportText.trim() || !supabase) return;
-    setSending(true); setSent(false);
+    const text = supportText.trim();
+    if (!text || !supabase) return;
+    setSending(true);
+    setSent(false);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase.from('support_requests').insert({
-        user_id: userData.user?.id ?? null,
-        name: profile?.full_name ?? userData.user?.user_metadata?.full_name ?? null,
-        email: userData.user?.email ?? null,
-        message: supportText.trim(),
-        source: 'assistant',
-        page_path: window.location.pathname,
-      });
-      if (error) throw error;
-      setSent(true); setSupportText('');
-      setMessages(prev => [...prev, { id: Date.now(), from: 'bot', text: 'تم إرسال طلبك للدعم بنجاح ✅ فريق الدعم سيراجعه.' }]);
+      const conversationId = await createStudentSupportConversation(text, window.location.pathname);
+      setSupportText('');
+      setSent(true);
+      await loadSupport();
+      setMessages(prev => [...prev, { id: `support-${Date.now()}`, from: 'bot', text: t('assistant.supportSuccess') }]);
+      if (!conversationId) throw new Error('Conversation was not created');
     } catch {
-      setMessages(prev => [...prev, { id: Date.now(), from: 'bot', text: 'تعذر إرسال الطلب حاليًا. تأكد من الاتصال وحاول مرة أخرى.' }]);
-    } finally { setSending(false); }
+      setMessages(prev => [...prev, { id: `support-error-${Date.now()}`, from: 'bot', text: t('assistant.supportError') }]);
+    } finally {
+      setSending(false);
+    }
   };
 
+  const supportStatus = conversation?.status === 'HUMAN_ACTIVE' || conversation?.status === 'ASSIGNED'
+    ? 'support.active'
+    : conversation?.status === 'WAITING_FOR_HUMAN' || conversation?.status === 'REOPENED'
+      ? 'support.waiting'
+      : null;
+
   return <>
-    {open && <section className="assistant-panel" aria-label="مساعد ENG OSAMA">
+    {open && <section className="assistant-panel" aria-label={t('assistant.title')}>
       <div className="assistant-head">
-        <div className="assistant-title"><span className="assistant-avatar"><Bot size={19}/></span><div><strong>مساعد ENG OSAMA</strong><small>مساعدة داخل المنصة</small></div></div>
-        <button className="icon-btn" onClick={() => setOpen(false)} aria-label="إغلاق"><X size={18}/></button>
+        <div className="assistant-title"><span className="assistant-avatar"><Bot size={19}/></span><div><strong>{t('assistant.title')}</strong><small>{t('assistant.subtitle')}</small></div></div>
+        <button className="icon-btn" onClick={() => setOpen(false)} aria-label={t('assistant.close')}><X size={18}/></button>
       </div>
       <div className="assistant-body" ref={scrollRef}>
-        {messages.map(m => <div key={m.id} className={`assistant-message ${m.from}`}>{m.text}</div>)}
-        {!supportOpen && <div className="assistant-quick">{quickReplies.map(q => <button key={q} onClick={() => q === 'عايز أكلم الدعم' ? setSupportOpen(true) : sendMessage(q)}>{q}</button>)}</div>}
-        {supportOpen && <div className="assistant-support-box"><div className="assistant-support-title"><LifeBuoy size={17}/> إرسال للدعم</div><textarea value={supportText} onChange={e => setSupportText(e.target.value)} placeholder="اكتب المشكلة بالتفصيل..." rows={4}/><div className="assistant-support-actions"><button className="btn btn-ghost" onClick={() => setSupportOpen(false)}>رجوع</button><button className="btn btn-primary" disabled={sending || !supportText.trim()} onClick={sendSupport}>{sending ? 'جارٍ الإرسال...' : 'إرسال الطلب'}</button></div>{sent && <small className="assistant-success">تم الإرسال.</small>}</div>}
+        {supportOpen ? <>
+          {supportMessages.map(message => <div key={message.id} className={`assistant-message ${message.sender_role === 'student' ? 'user' : 'bot'}`}>{message.body}</div>)}
+          {supportStatus && <div className="assistant-support-status">{t(supportStatus)}</div>}
+          {!conversation && <div className="assistant-support-box"><div className="assistant-support-title"><LifeBuoy size={17}/>{t('assistant.supportTitle')}</div><textarea value={supportText} onChange={e => setSupportText(e.target.value)} placeholder={t('assistant.supportPlaceholder')} rows={4}/><div className="assistant-support-actions"><button className="btn btn-ghost" onClick={() => setSupportOpen(false)}>{t('assistant.back')}</button><button className="btn btn-primary" disabled={sending || !supportText.trim()} onClick={sendSupport}>{sending ? t('assistant.sending') : t('assistant.sendRequest')}</button></div>{sent && <small className="assistant-success">{t('assistant.sent')}</small>}</div>}
+          {conversation && <div className="assistant-support-box"><div className="assistant-support-title"><LifeBuoy size={17}/>{t('assistant.supportTitle')}</div><textarea value={supportText} onChange={e => setSupportText(e.target.value)} placeholder={t('assistant.supportPlaceholder')} rows={3}/><div className="assistant-support-actions"><button className="btn btn-ghost" onClick={() => setSupportOpen(false)}>{t('assistant.back')}</button><button className="btn btn-primary" disabled={sending || !supportText.trim()} onClick={sendSupport}>{sending ? t('assistant.sending') : t('common.send')}</button></div></div>}
+        </> : <>
+          {messages.map(message => <div key={message.id} className={`assistant-message ${message.from}`}>{message.text}</div>)}
+          <div className="assistant-quick">
+            <button onClick={() => sendMessage(t('assistant.start'))}>{t('assistant.start')}</button>
+            <button onClick={() => sendMessage(t('assistant.course'))}>{t('assistant.course')}</button>
+            <button onClick={() => setSupportOpen(true)}>{t('assistant.supportShort')}</button>
+          </div>
+        </>}
       </div>
-      {!supportOpen && <div className="assistant-composer"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }} placeholder="اكتب رسالتك..." aria-label="رسالتك"/><button onClick={() => sendMessage()} disabled={!input.trim()} aria-label="إرسال"><Send size={17}/></button></div>}
-      {!supportOpen && <button className="assistant-support-link" onClick={() => setSupportOpen(true)}><LifeBuoy size={16}/> محتاج تتواصل مع الدعم؟</button>}
+      {!supportOpen && <div className="assistant-composer"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendMessage(); }} placeholder={t('assistant.placeholder')} aria-label={t('assistant.message')}/><button onClick={() => sendMessage()} disabled={!input.trim()} aria-label={t('assistant.send')}><Send size={17}/></button></div>}
+      {!supportOpen && <button className="assistant-support-link" onClick={() => setSupportOpen(true)}><LifeBuoy size={16}/> {t('assistant.support')}</button>}
     </section>}
-    <button className={`assistant-fab ${open ? 'active' : ''}`} onClick={() => setOpen(v => !v)} aria-label={open ? 'إغلاق المساعد' : 'فتح المساعد'}>{open ? <ChevronDown size={24}/> : <MessageCircle size={25}/>}<span>مساعد</span></button>
+    <button className={`assistant-fab ${open ? 'active' : ''}`} onClick={() => setOpen(v => !v)} aria-label={open ? t('assistant.close') : t('assistant.open')}>{open ? <ChevronDown size={24}/> : <MessageCircle size={25}/>}<span>{t('assistant.title').split(' ')[0]}</span></button>
   </>;
 }

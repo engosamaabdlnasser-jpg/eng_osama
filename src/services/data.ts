@@ -39,6 +39,8 @@ export const defaultSiteSettings: SiteSettings = {
   support_whatsapp: '',
   support_email: '',
   support_hours: 'متاحون لمساعدتك عند الحاجة',
+  support_retention_human_hours: 72,
+  support_retention_ai_hours: 72,
   auth_background_image: '',
   auth_visual_image: '',
   auth_logo_light: '/eng-osama-logo-light.png',
@@ -272,4 +274,85 @@ export async function getAdminStudentDetails(userId: string): Promise<AdminStude
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error('لم يتم العثور على بيانات الطالب.');
   return row as AdminStudentDetails;
+}
+
+export async function createStudentSupportConversation(message: string, pagePath: string | null = null): Promise<string> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.rpc('create_student_support_conversation', {
+    p_message: message.trim(),
+    p_page_path: pagePath,
+  });
+  if (error) throw error;
+  if (typeof data !== 'string') throw new Error('تعذر إنشاء محادثة الدعم.');
+  return data;
+}
+
+export async function getStudentSupportConversation(): Promise<{ conversation: import('../types').Conversation | null; messages: import('../types').ConversationMessage[] }> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return { conversation: null, messages: [] };
+  const { data: conversations, error: conversationError } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('student_id', userData.user.id)
+    .in('status', ['WAITING_FOR_HUMAN', 'ASSIGNED', 'HUMAN_ACTIVE', 'WAITING_FOR_STUDENT', 'REOPENED', 'RESOLVED', 'CLOSED', 'RETENTION_PENDING'])
+    .order('updated_at', { ascending: false })
+    .limit(1);
+  if (conversationError) throw conversationError;
+  const conversation = (conversations?.[0] ?? null) as import('../types').Conversation | null;
+  if (!conversation) return { conversation: null, messages: [] };
+  const { data: messages, error: messageError } = await supabase
+    .from('conversation_messages')
+    .select('*')
+    .eq('conversation_id', conversation.id)
+    .order('created_at', { ascending: true });
+  if (messageError) throw messageError;
+  return { conversation, messages: (messages ?? []) as import('../types').ConversationMessage[] };
+}
+
+export async function getAdminSupportConversations(): Promise<import('../types').Conversation[]> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .in('status', ['WAITING_FOR_HUMAN', 'ASSIGNED', 'HUMAN_ACTIVE', 'WAITING_FOR_STUDENT', 'REOPENED', 'RESOLVED', 'CLOSED', 'RETENTION_PENDING'])
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as import('../types').Conversation[];
+}
+
+export async function getConversationMessages(conversationId: string): Promise<import('../types').ConversationMessage[]> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.from('conversation_messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as import('../types').ConversationMessage[];
+}
+
+export async function acceptSupportConversation(conversationId: string): Promise<import('../types').Conversation> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.rpc('accept_support_conversation', { p_conversation_id: conversationId });
+  if (error) throw error;
+  if (!data) throw new Error('تعذر قبول المحادثة.');
+  return data as import('../types').Conversation;
+}
+
+export async function sendAdminConversationMessage(conversationId: string, body: string): Promise<import('../types').ConversationMessage> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error('Authentication required');
+  const { data, error } = await supabase.from('conversation_messages').insert({
+    conversation_id: conversationId,
+    sender_id: userData.user.id,
+    sender_role: 'admin',
+    body: body.trim(),
+  }).select('*').single();
+  if (error) throw error;
+  return data as import('../types').ConversationMessage;
+}
+
+export async function updateSupportConversationStatus(conversationId: string, status: import('../types').ConversationStatus): Promise<import('../types').Conversation> {
+  if (!supabase) throw new Error('Supabase غير مربوط.');
+  const { data, error } = await supabase.from('conversations').update({ status }).eq('id', conversationId).select('*').single();
+  if (error) throw error;
+  return data as import('../types').Conversation;
 }

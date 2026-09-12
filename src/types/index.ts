@@ -1,6 +1,6 @@
-export type Category={id:string;name:string;created_at?:string};
-export type Lesson={id:string;course_id:string;title:string;description:string;youtube_url:string;sort_order:number;created_at?:string};
-export type Course={id:string;title:string;description:string;image_url:string|null;category_id:string|null;instructor_name:string;published:boolean;created_at?:string;category?:Category;lessons?:Lesson[]};
+export type Category={id:string;name:string;name_ar?:string|null;name_en?:string|null;created_at?:string};
+export type Lesson={id:string;course_id:string;title:string;description:string;title_ar?:string|null;title_en?:string|null;description_ar?:string|null;description_en?:string|null;youtube_url:string;sort_order:number;created_at?:string};
+export type Course={id:string;title:string;description:string;title_ar?:string|null;title_en?:string|null;description_ar?:string|null;description_en?:string|null;image_url:string|null;category_id:string|null;instructor_name:string;published:boolean;created_at?:string;category?:Category;lessons?:Lesson[]};
 export type Profile={id:string;full_name:string|null;phone:string|null;age:number|null;bio:string|null;avatar_url:string|null;profile_setup_completed:boolean;role:'student'|'admin';created_at?:string};
 export type UserProgress={completedIds:Set<string>;completedAt:Record<string,string>;lastCompletedAt:string|null};
 export type HomeExtraSection={enabled:boolean;title:string;description:string;button_label:string;button_url:string};

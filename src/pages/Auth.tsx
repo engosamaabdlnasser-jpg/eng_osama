@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { defaultSiteSettings, getProfile, getSiteSettings, updateProfileDetails, uploadProfileAvatar } from '../services/data';
 import type { Profile, SiteSettings } from '../types';
 import { useTheme } from '../components/ThemeProvider';
+import { useI18n } from '../i18n';
 
 function friendlyAuthError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || '');
@@ -20,6 +21,7 @@ function friendlyAuthError(error: unknown) {
 
 function AuthTopbar({ settings, mode }: { settings: SiteSettings; mode: 'login' | 'signup' | 'profile' }) {
   const { theme, toggleTheme } = useTheme();
+  const { locale, setLocale, t } = useI18n();
   const lightLogo = settings.auth_logo_light || '/eng-osama-logo-light.png';
   const darkLogo = settings.auth_logo_dark || '/eng-osama-logo-dark.png';
   return <header className="immersive-auth-header">
@@ -29,7 +31,7 @@ function AuthTopbar({ settings, mode }: { settings: SiteSettings; mode: 'login' 
         <img className="immersive-auth-logo immersive-auth-logo-dark" src={darkLogo} alt="" aria-hidden="true" />
         <strong>{settings.brand_name || 'ENG OSAMA'}</strong>
       </Link>
-      <div className="immersive-auth-header-actions">
+      <div className="immersive-auth-header-actions"><div className="language-switcher" role="group" aria-label={t('nav.language')}><button type="button" className={locale==='ar'?'active':''} onClick={()=>setLocale('ar')} aria-pressed={locale==='ar'}>العربية</button><button type="button" className={locale==='en'?'active':''} onClick={()=>setLocale('en')} aria-pressed={locale==='en'}>English</button></div>
         <button className="theme-toggle immersive-theme-toggle" onClick={toggleTheme} type="button" title={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'} aria-label={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'}>
           {theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}<span>{theme === 'dark' ? 'فاتح' : 'داكن'}</span>
         </button>

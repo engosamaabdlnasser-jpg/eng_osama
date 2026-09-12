@@ -6,6 +6,7 @@ import { getProfile, getSiteSettings } from '../services/data';
 import type { Profile } from '../types';
 import { useTheme } from './ThemeProvider';
 import { componentStyle } from './EditableRegion';
+import { useI18n } from '../i18n';
 
 export default function Navbar(){
   const [open,setOpen]=useState(false);
@@ -13,6 +14,7 @@ export default function Navbar(){
   const [logoUrl,setLogoUrl]=useState('/eng-osama-symbol-light.png');
   const [brandName,setBrandName]=useState('ENG OSAMA');
   const { theme, toggleTheme } = useTheme();
+  const { locale, setLocale, t } = useI18n();
   const [siteSettings,setSiteSettings] = useState<any>(null);
 
   useEffect(()=>{
@@ -45,18 +47,20 @@ export default function Navbar(){
   return <header className="site-header" style={headerStyle}><div className="container navbar-inner">
     <Link to="/" className="brand" onClick={close}>{brand}</Link>
     <nav className="desktop-nav">
-      {profile && <><NavLink to="/courses">الكورسات</NavLink><NavLink to="/categories">التصنيفات</NavLink></>}
-      {profile?.role === 'admin' && <NavLink to="/admin">الإدارة</NavLink>}
-      <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'} aria-label={theme === 'dark' ? 'تفعيل المظهر الفاتح' : 'تفعيل المظهر الداكن'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
-      {profile ? <Link className="btn btn-ghost account-link" to="/account"><UserCircle2 size={17}/> حسابي</Link> : <Link className="btn btn-primary" to="/login"><LogIn size={17}/> تسجيل الدخول</Link>}
+      {profile && <><NavLink to="/courses">{t('nav.courses')}</NavLink><NavLink to="/categories">{t('nav.categories')}</NavLink></>}
+      {profile?.role === 'admin' && <NavLink to="/admin">{t('nav.admin')}</NavLink>}
+      <div className="language-switcher" role="group" aria-label={t('nav.language')}><button type="button" className={locale==='ar'?'active':''} onClick={()=>setLocale('ar')} aria-pressed={locale==='ar'}>العربية</button><button type="button" className={locale==='en'?'active':''} onClick={()=>setLocale('en')} aria-pressed={locale==='en'}>English</button></div>
+      <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? t('nav.theme.light') : t('nav.theme.dark')} aria-label={theme === 'dark' ? t('nav.theme.light') : t('nav.theme.dark')}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
+      {profile ? <Link className="btn btn-ghost account-link" to="/account"><UserCircle2 size={17}/> {t('nav.account')}</Link> : <Link className="btn btn-primary" to="/login"><LogIn size={17}/> {t('nav.login')}</Link>}
     </nav>
-    <button className="btn btn-ghost mobile-menu-btn" onClick={()=>setOpen(!open)} aria-label={open ? "إغلاق القائمة" : "فتح القائمة"} aria-expanded={open} aria-controls="mobile-navigation">{open?<X/>:<Menu/>}</button>
+    <button className="btn btn-ghost mobile-menu-btn" onClick={()=>setOpen(!open)} aria-label={open ? t('nav.menu.close') : t('nav.menu.open')} aria-expanded={open} aria-controls="mobile-navigation">{open?<X/>:<Menu/>}</button>
   </div>
   {open&&<div id="mobile-navigation" className="container mobile-menu">
-    {profile && <><Link to="/courses" onClick={close}><BookOpen size={17}/> الكورسات</Link><Link to="/categories" onClick={close}>التصنيفات</Link></>}
-    {profile?.role === 'admin' && <Link to="/admin" onClick={close}>الإدارة</Link>}
-    <button className="mobile-theme" onClick={toggleTheme}>{theme === 'dark' ? <><Sun size={17}/> المظهر الفاتح</> : <><Moon size={17}/> المظهر الداكن</>}</button>
-    {profile ? <Link to="/account" onClick={close}><UserCircle2 size={17}/> حسابي</Link> : <Link to="/login" onClick={close}><LogIn size={17}/> تسجيل الدخول</Link>}
+    {profile && <><Link to="/courses" onClick={close}><BookOpen size={17}/> {t('nav.courses')}</Link><Link to="/categories" onClick={close}>{t('nav.categories')}</Link></>}
+    {profile?.role === 'admin' && <Link to="/admin" onClick={close}>{t('nav.admin')}</Link>}
+    <div className="language-switcher mobile-language" role="group" aria-label={t('nav.language')}><button type="button" className={locale==='ar'?'active':''} onClick={()=>setLocale('ar')} aria-pressed={locale==='ar'}>العربية</button><button type="button" className={locale==='en'?'active':''} onClick={()=>setLocale('en')} aria-pressed={locale==='en'}>English</button></div>
+    <button className="mobile-theme" onClick={toggleTheme}>{theme === 'dark' ? <><Sun size={17}/> {t('nav.light')}</> : <><Moon size={17}/> {t('nav.dark')}</>}</button>
+    {profile ? <Link to="/account" onClick={close}><UserCircle2 size={17}/> {t('nav.account')}</Link> : <Link to="/login" onClick={close}><LogIn size={17}/> {t('nav.login')}</Link>}
   </div>}
   </header>
 }
